@@ -1,5 +1,6 @@
 # Docker Dev Panel Backend Configuration
 port: "12581"
+log_level: "INFO"       # 可选：DEBUG, INFO, WARN, ERROR
 
 # CORS (跨域请求) 配置
 cors:
