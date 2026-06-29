@@ -29,7 +29,7 @@ jobs:
         run: go mod download
 
       - name: Build
-        run: go build -v ./cmd/server
+        run: go build -v -o bin/server ./cmd/server
 
       # Optional: Add test step if tests exist
       # - name: Test
