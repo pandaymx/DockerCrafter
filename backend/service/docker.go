@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/moby/moby/client"
 	"docker-dev-panel/config"
+	"docker-dev-panel/logger"
 	"docker-dev-panel/models"
 )
 
@@ -54,7 +54,7 @@ func NewDockerService(engineConfigs []config.DockerEngineConfig) (*DockerService
 
 		cli, err := client.NewClientWithOpts(opts...)
 		if err != nil {
-			log.Printf("⚠️ 警告：连接 Docker 实例 [%s] 失败: %v", ec.Name, err)
+			logger.Warnf("连接 Docker 实例 [%s] 失败: %v", ec.Name, err)
 			continue
 		}
 
@@ -75,7 +75,7 @@ func NewDockerService(engineConfigs []config.DockerEngineConfig) (*DockerService
 func (s *DockerService) Close() {
 	for _, c := range s.clients {
 		if err := c.Cli.Close(); err != nil {
-			log.Printf("⚠️ 关闭 Docker 实例 [%s] 客户端连接失败: %v", c.Name, err)
+			logger.Warnf("关闭 Docker 实例 [%s] 客户端连接失败: %v", c.Name, err)
 		}
 	}
 }
@@ -127,7 +127,7 @@ type DockerStats struct {
 	} `json:"memory_stats"`
 }
 
-// calculateCPUPercent 计算容器的 CPU 使用百分比
+// calculateCPUPercent 计算容器 of CPU 使用百分比
 func calculateCPUPercent(stats *DockerStats) float64 {
 	cpuDelta := float64(stats.CPUStats.CPUUsage.TotalUsage) - float64(stats.PreCPUStats.CPUUsage.TotalUsage)
 	systemDelta := float64(stats.CPUStats.SystemUsage) - float64(stats.PreCPUStats.SystemUsage)
@@ -206,7 +206,7 @@ func (s *DockerService) fetchAllContainerStats(ctx context.Context, cli *client.
 			defer wg.Done()
 			cpu, mem, err := s.fetchContainerStats(ctx, cli, containerID)
 			if err != nil {
-				log.Printf("⚠️ 抓取容器 [%s] 监控指标失败: %v", containerID, err)
+				logger.Warnf("抓取容器 [%s] 监控指标失败: %v", containerID, err)
 				return
 			}
 			mu.Lock()
@@ -239,7 +239,7 @@ func (s *DockerService) GetProjectWorkspaces(ctx context.Context) ([]models.Proj
 
 			workspaces, err := s.getEngineWorkspaces(engineCtx, c.Cli, c.Name)
 			if err != nil {
-				log.Printf("⚠️ 获取 Docker 实例 [%s] 容器失败: %v", c.Name, err)
+				logger.Warnf("获取 Docker 实例 [%s] 容器失败: %v", c.Name, err)
 				return
 			}
 

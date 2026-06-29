@@ -3,10 +3,10 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 
 	"docker-dev-panel/config"
+	"docker-dev-panel/logger"
 	"docker-dev-panel/service"
 )
 
@@ -31,9 +31,9 @@ func (s *Server) Start() error {
 	http.HandleFunc("/api/projects", s.handleProjects)
 
 	addr := ":" + s.cfg.Port
-	log.Printf("🚀 后端服务已启动，监听地址为 http://localhost%s", addr)
-	log.Printf("🔍 API 接口地址: http://localhost%s/api/projects", addr)
-	log.Printf("🏥 健康检查地址: http://localhost%s/api/health", addr)
+	logger.Infof("🚀 后端服务已启动，监听地址为 http://localhost%s (日志级别: %s)", addr, s.cfg.LogLevel)
+	logger.Infof("🔍 API 接口地址: http://localhost%s/api/projects", addr)
+	logger.Infof("🏥 健康检查地址: http://localhost%s/api/health", addr)
 
 	return http.ListenAndServe(addr, nil)
 }
@@ -50,6 +50,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logger.Debugf("收到健康检查请求来自: %s", r.RemoteAddr)
+
 	dockerStatus := "disconnected"
 	if s.dockerService.Ping(r.Context()) {
 		dockerStatus = "connected"
@@ -62,7 +64,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("健康检查 JSON 编码失败: %v", err)
+		logger.Errorf("健康检查 JSON 编码失败: %v", err)
 	}
 }
 
@@ -83,16 +85,18 @@ func (s *Server) handleProjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logger.Debugf("收到项目工作区列表请求来自: %s", r.RemoteAddr)
+
 	// 获取项目工作区数据
 	workspaces, err := s.dockerService.GetProjectWorkspaces(r.Context())
 	if err != nil {
-		log.Printf("获取项目工作区失败: %v", err)
+		logger.Errorf("获取项目工作区失败: %v", err)
 		http.Error(w, fmt.Sprintf("获取数据失败: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	// 序列化并返回
 	if err := json.NewEncoder(w).Encode(workspaces); err != nil {
-		log.Printf("JSON 编码失败: %v", err)
+		logger.Errorf("JSON 编码失败: %v", err)
 	}
 }
