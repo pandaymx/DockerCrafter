@@ -2,8 +2,10 @@ import { useEffect, useState, useMemo } from "react";
 import type { ProjectWorkspace } from './types';
 import { formatBytes } from './utils/format';
 import { WorkspaceCard } from './components/WorkspaceCard';
+import { useTranslation } from 'react-i18next';
 
 export default function App() {
+  const { t, i18n } = useTranslation();
   const [workspaces, setWorkspaces] = useState<ProjectWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -140,7 +142,7 @@ export default function App() {
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
-        <span className="text-sm font-medium tracking-wider text-slate-300 animate-pulse">正在扫描本地 Docker 拓扑空间...</span>
+        <span className="text-sm font-medium tracking-wider text-slate-300 animate-pulse">{t('loading')}</span>
       </div>
     );
   }
@@ -163,15 +165,46 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-2xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-emerald-400 bg-clip-text text-transparent">
-              🐳 DockerCrafter Workspace v1.0
+              🐳 {t('title')} v1.0
             </h1>
             <p className="text-slate-400 text-xs mt-1 font-mono">
-              智能工作区模式：已自动聚合本地 Compose 项目与独立容器 • 最后同步：{lastUpdated || "同步中..."}
+              {t('subtitle', { lastUpdated: lastUpdated || t('syncing') })}
             </p>
           </div>
-          <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-mono">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
-            <span className="text-slate-300">Backend Status: Online (Go 1.26)</span>
+          <div className="flex items-center gap-3">
+            {/* 语言切换器 */}
+            <div className="flex items-center bg-slate-900/60 border border-slate-800 p-0.5 rounded-xl text-xs font-mono">
+              <button
+                onClick={() => {
+                  i18n.changeLanguage('zh');
+                  localStorage.setItem('docker-dev-panel-lang', 'zh');
+                }}
+                className={`px-2.5 py-1 rounded-lg transition-all ${
+                  i18n.language === 'zh'
+                    ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 text-blue-400 font-bold'
+                    : 'border border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                中文
+              </button>
+              <button
+                onClick={() => {
+                  i18n.changeLanguage('en');
+                  localStorage.setItem('docker-dev-panel-lang', 'en');
+                }}
+                className={`px-2.5 py-1 rounded-lg transition-all ${
+                  i18n.language === 'en'
+                    ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 text-blue-400 font-bold'
+                    : 'border border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                EN
+              </button>
+            </div>
+            <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+              <span className="text-slate-300">{t('backendStatus')}</span>
+            </div>
           </div>
         </div>
       </header>
@@ -182,7 +215,7 @@ export default function App() {
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="glass-panel rounded-xl p-4 flex items-center justify-between">
             <div>
-              <span className="text-xs text-slate-500 font-medium">应用工作区</span>
+              <span className="text-xs text-slate-500 font-medium">{t('stats.workspaces')}</span>
               <h3 className="text-2xl font-bold mt-1 text-indigo-400">{stats.totalWorkspaces}</h3>
             </div>
             <div className="p-2.5 bg-indigo-500/10 rounded-lg text-indigo-400">
@@ -195,7 +228,7 @@ export default function App() {
           <div className="glass-panel rounded-xl p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-slate-500 font-medium">容器总数</span>
+                <span className="text-xs text-slate-500 font-medium">{t('stats.containers')}</span>
                 <h3 className="text-2xl font-bold mt-1">{stats.totalContainers}</h3>
               </div>
               <div className="p-2.5 bg-emerald-500/10 rounded-lg text-emerald-400">
@@ -207,8 +240,8 @@ export default function App() {
             {stats.totalContainers > 0 && (
               <div className="mt-3">
                 <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-                  <span>运行中 ({stats.runningContainers})</span>
-                  <span>已停止 ({stats.stoppedContainers})</span>
+                  <span>{t('stats.running')} ({stats.runningContainers})</span>
+                  <span>{t('stats.stopped')} ({stats.stoppedContainers})</span>
                 </div>
                 <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden flex">
                   <div className="bg-emerald-500 h-full" style={{ width: `${(stats.runningContainers / stats.totalContainers) * 100}%` }}></div>
@@ -221,7 +254,7 @@ export default function App() {
           <div className="glass-panel rounded-xl p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-slate-500 font-medium">总 CPU 开销</span>
+                <span className="text-xs text-slate-500 font-medium">{t('stats.cpu')}</span>
                 <h3 className="text-2xl font-bold mt-1 text-cyan-400">{stats.totalCPU.toFixed(1)}%</h3>
               </div>
               <div className="p-2.5 bg-cyan-500/10 rounded-lg text-cyan-400">
@@ -245,7 +278,7 @@ export default function App() {
           <div className="glass-panel rounded-xl p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-slate-500 font-medium">运行内存开销</span>
+                <span className="text-xs text-slate-500 font-medium">{t('stats.memory')}</span>
                 <h3 className="text-2xl font-bold mt-1 text-purple-400">{formatBytes(stats.totalMemory)}</h3>
               </div>
               <div className="p-2.5 bg-purple-500/10 rounded-lg text-purple-400">
@@ -279,7 +312,7 @@ export default function App() {
             </span>
             <input
               type="text"
-              placeholder="搜索工作区、容器名称、镜像..."
+              placeholder={t('filter.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
@@ -304,19 +337,19 @@ export default function App() {
                 onClick={() => setStatusFilter("all")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${statusFilter === "all" ? "bg-slate-800 text-slate-100 shadow-sm" : "text-slate-400 hover:text-slate-200"}`}
               >
-                全部
+                {t('filter.statusAll')}
               </button>
               <button 
                 onClick={() => setStatusFilter("running")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${statusFilter === "running" ? "bg-emerald-950/50 text-emerald-400 shadow-sm" : "text-slate-400 hover:text-slate-200"}`}
               >
-                运行中
+                {t('filter.statusRunning')}
               </button>
               <button 
                 onClick={() => setStatusFilter("stopped")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${statusFilter === "stopped" ? "bg-rose-950/50 text-rose-400 shadow-sm" : "text-slate-400 hover:text-slate-200"}`}
               >
-                已停止
+                {t('filter.statusStopped')}
               </button>
             </div>
 
@@ -326,34 +359,34 @@ export default function App() {
                 onClick={() => setTypeFilter("all")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${typeFilter === "all" ? "bg-slate-800 text-slate-100 shadow-sm" : "text-slate-400 hover:text-slate-200"}`}
               >
-                全部模式
+                {t('filter.typeAll')}
               </button>
               <button 
                 onClick={() => setTypeFilter("compose")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${typeFilter === "compose" ? "bg-indigo-950/50 text-indigo-400 shadow-sm" : "text-slate-400 hover:text-slate-200"}`}
               >
-                Compose
+                {t('filter.typeCompose')}
               </button>
               <button 
                 onClick={() => setTypeFilter("standalone")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${typeFilter === "standalone" ? "bg-slate-800 text-slate-200 shadow-sm" : "text-slate-400 hover:text-slate-200"}`}
               >
-                独立容器
+                {t('filter.typeStandalone')}
               </button>
             </div>
 
             {/* 排序筛选 */}
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 whitespace-nowrap">排序:</span>
+              <span className="text-xs text-slate-500 whitespace-nowrap">{t('filter.sortBy')}</span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
                 className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500"
               >
-                <option value="name">工作区名称</option>
-                <option value="containers">容器数量</option>
-                <option value="cpu">CPU 负荷</option>
-                <option value="memory">内存消耗</option>
+                <option value="name">{t('filter.sortName')}</option>
+                <option value="containers">{t('filter.sortContainers')}</option>
+                <option value="cpu">{t('filter.sortCpu')}</option>
+                <option value="memory">{t('filter.sortMemory')}</option>
               </select>
             </div>
 
@@ -366,8 +399,8 @@ export default function App() {
             <svg width="48" height="48" className="mx-auto h-12 w-12 text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="text-base font-medium text-slate-400">没有找到匹配的工作区或容器</p>
-            <p className="text-xs text-slate-600 mt-1">请尝试清除搜索关键字或重置过滤器选项</p>
+            <p className="text-base font-medium text-slate-400">{t('noMatch')}</p>
+            <p className="text-xs text-slate-600 mt-1">{t('noMatchSub')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
@@ -377,12 +410,12 @@ export default function App() {
                 workspace={workspace}
                 isCollapsed={!!collapsedWorkspaces[workspace.projectName]}
                 onToggleCollapse={() => toggleCollapse(workspace.projectName)}
-                onBatchStart={(name) => showToast(`批量启动命令已发送至工作区：${name}`)}
-                onBatchStop={(name) => showToast(`批量停止命令已发送至工作区：${name}`)}
-                onContainerStart={(name) => showToast(`已向容器 ${name} 发送启动 (Start) 指令`)}
-                onContainerStop={(name) => showToast(`已向容器 ${name} 发送停止 (Stop) 指令`)}
-                onContainerRestart={(name) => showToast(`已向容器 ${name} 发送重启 (Restart) 指令`)}
-                onContainerLogs={() => showToast(`提示：在前端启用控制与指令自动化相关功能，需要同时将后端 API 升级。请连接控制后端。`)}
+                onBatchStart={(name) => showToast(t('toast.batchStart', { name }))}
+                onBatchStop={(name) => showToast(t('toast.batchStop', { name }))}
+                onContainerStart={(name) => showToast(t('toast.containerStart', { name }))}
+                onContainerStop={(name) => showToast(t('toast.containerStop', { name }))}
+                onContainerRestart={(name) => showToast(t('toast.containerRestart', { name }))}
+                onContainerLogs={() => showToast(t('toast.backendUpgradeTip'))}
               />
             ))}
           </div>

@@ -1,5 +1,6 @@
 // src/components/ContainerCard.tsx
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ContainerInfo } from '../types';
 import { formatBytes } from '../utils/format';
 
@@ -18,6 +19,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
   onRestart,
   onLogs,
 }) => {
+  const { t } = useTranslation();
   const isRunning = container.state === 'running';
 
   // Dynamic performance bar colors
@@ -44,7 +46,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
             {isRunning ? (
               <button
                 onClick={() => onStop?.(container.name)}
-                title="停止容器"
+                title={t('container.stop')}
                 className="p-1 hover:text-rose-400 hover:bg-slate-700 rounded transition text-xs"
               >
                 ⏹️
@@ -52,7 +54,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
             ) : (
               <button
                 onClick={() => onStart?.(container.name)}
-                title="启动容器"
+                title={t('container.start')}
                 className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition text-xs"
               >
                 ▶️
@@ -60,14 +62,14 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
             )}
             <button
               onClick={() => onRestart?.(container.name)}
-              title="重启容器"
+              title={t('container.restart')}
               className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition text-xs"
             >
               🔄
             </button>
             <button
               onClick={() => onLogs?.(container.name)}
-              title="查看日志 / 终端"
+              title={t('container.logs')}
               className="p-1 hover:text-blue-400 hover:bg-slate-700 rounded transition font-mono text-xs"
             >
               &gt;_
@@ -109,8 +111,8 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
 
       {/* Internal details like Status & Image */}
       <div className="mb-3 text-[11px] font-mono text-slate-400 border-t border-slate-700/20 pt-2 space-y-0.5">
-        <div className="truncate"><span className="text-slate-500">Image:</span> {container.image}</div>
-        <div><span className="text-slate-500">Status:</span> {container.status}</div>
+        <div className="truncate"><span className="text-slate-500">{t('container.image')}:</span> {container.image}</div>
+        <div><span className="text-slate-500">{t('container.status')}:</span> {container.status}</div>
       </div>
 
       {/* Port forwards */}
@@ -128,7 +130,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
                 rel="noreferrer"
                 className="flex items-center justify-between bg-blue-950/30 hover:bg-blue-900/40 border border-blue-900/50 rounded-lg px-3 py-1.5 text-xs text-blue-400 transition"
               >
-                <span>{privatePort} (Int)</span>
+                <span>{privatePort} ({t('container.internalPort')})</span>
                 <span className="flex items-center gap-1 text-[11px] text-blue-300 font-semibold">
                   ➜ localhost:{publicPort}
                 </span>
@@ -138,7 +140,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
         </div>
       ) : (
         <div className="text-center text-[10px] text-slate-500 font-mono py-1.5 bg-slate-900/20 border border-dashed border-slate-700/20 rounded-lg">
-          No external ports mapped
+          {t('container.noPorts')}
         </div>
       )}
     </div>

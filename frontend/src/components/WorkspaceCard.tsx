@@ -1,5 +1,6 @@
 // src/components/WorkspaceCard.tsx
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ProjectWorkspace } from '../types';
 import { ContainerCard } from './ContainerCard';
 
@@ -26,6 +27,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   onContainerRestart,
   onContainerLogs,
 }) => {
+  const { t } = useTranslation();
   const runningCount = workspace.containers.filter((c) => c.state === 'running').length;
 
   return (
@@ -41,11 +43,11 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
               {workspace.isCompose ? '📁' : '📦'}
             </span>
             <div className="min-w-0">
-              <h3 className="font-bold text-slate-100 tracking-wide text-base uppercase font-mono truncate group-hover:text-blue-400 transition-colors">
+               <h3 className="font-bold text-slate-100 tracking-wide text-base uppercase font-mono truncate group-hover:text-blue-400 transition-colors">
                 {workspace.projectName}
               </h3>
               <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono mt-0.5">
-                <span>SERVICES: {workspace.containers.length} / RUNNING: {runningCount}</span>
+                <span>{t('workspace.services')}: {workspace.containers.length} / {t('workspace.running')}: {runningCount}</span>
                 {workspace.engineName && (
                   <span className="text-cyan-400 bg-cyan-950/20 px-1.5 py-0.2 rounded text-[9px] shrink-0">
                     ⚙️ {workspace.engineName}
@@ -63,7 +65,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                   e.stopPropagation();
                   onBatchStart?.(workspace.projectName);
                 }}
-                title="启动工作区所有容器"
+                title={t('workspace.startAll')}
                 className="p-1 hover:text-emerald-400 hover:bg-slate-800 rounded transition text-xs"
               >
                 ▶️
@@ -73,7 +75,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                   e.stopPropagation();
                   onBatchStop?.(workspace.projectName);
                 }}
-                title="停止工作区所有容器"
+                title={t('workspace.stopAll')}
                 className="p-1 hover:text-rose-400 hover:bg-slate-800 rounded transition text-xs"
               >
                 ⏹️
@@ -81,14 +83,14 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
             </div>
 
             <span className="hidden sm:inline text-[10px] bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700/50 font-mono">
-              {workspace.isCompose ? 'Compose Project' : 'Standalone'}
+              {workspace.isCompose ? t('workspace.composeProject') : t('workspace.standalone')}
             </span>
 
             {/* Collapse toggle */}
             <button
               onClick={onToggleCollapse}
               className="text-slate-400 hover:text-slate-200 transition-colors p-1 hover:bg-slate-800/50 rounded"
-              title={isCollapsed ? '展开工作区' : '折叠工作区'}
+              title={isCollapsed ? t('workspace.expand') : t('workspace.collapse')}
             >
               <svg
                 width="16"
@@ -125,8 +127,8 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
 
       {/* Workspace footer */}
       <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mt-4 pt-3 border-t border-slate-800/60">
-        <div>TOTAL SERVICES: {workspace.containers.length}</div>
-        <div className="flex items-center gap-1">📍 LOCAL ENVIRONMENT</div>
+        <div>{t('workspace.totalServices', { count: workspace.containers.length })}</div>
+        <div className="flex items-center gap-1">📍 {t('workspace.localEnv')}</div>
       </div>
     </div>
   );
