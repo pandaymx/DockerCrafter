@@ -15,10 +15,18 @@ type DockerEngineConfig struct {
 	CertPath  string `yaml:"cert_path"`
 }
 
+// CorsConfig 保存 CORS 相关的跨域配置
+type CorsConfig struct {
+	AllowOrigin  string `yaml:"allow_origin"`
+	AllowMethods string `yaml:"allow_methods"`
+	AllowHeaders string `yaml:"allow_headers"`
+}
+
 // Config 保存应用程序的全局配置信息
 type Config struct {
 	Port          string               `yaml:"port"`
 	DockerEngines []DockerEngineConfig `yaml:"docker_engines"`
+	CORS          CorsConfig           `yaml:"cors"`
 }
 
 // LoadConfig 级联加载配置，优先级为：
@@ -27,6 +35,7 @@ func LoadConfig() *Config {
 	// 1. 设置默认值
 	resolvedPort := "12581"
 	var engines []DockerEngineConfig
+	var corsCfg CorsConfig
 
 	// 2. 尝试从 YAML 配置文件中读取
 	configFile := "config.yaml"
@@ -37,6 +46,7 @@ func LoadConfig() *Config {
 				resolvedPort = yamlCfg.Port
 			}
 			engines = yamlCfg.DockerEngines
+			corsCfg = yamlCfg.CORS
 		}
 	}
 
@@ -64,8 +74,20 @@ func LoadConfig() *Config {
 		}
 	}
 
+	// 6. 设置默认 CORS 配置（若未配置，默认全开以便开发调试）
+	if corsCfg.AllowOrigin == "" {
+		corsCfg.AllowOrigin = "*"
+	}
+	if corsCfg.AllowMethods == "" {
+		corsCfg.AllowMethods = "GET, OPTIONS"
+	}
+	if corsCfg.AllowHeaders == "" {
+		corsCfg.AllowHeaders = "Content-Type"
+	}
+
 	return &Config{
 		Port:          resolvedPort,
 		DockerEngines: engines,
+		CORS:          corsCfg,
 	}
 }

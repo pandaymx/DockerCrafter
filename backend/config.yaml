@@ -1,6 +1,12 @@
 # Docker Dev Panel Backend Configuration
 port: "12581"
 
+# CORS (跨域请求) 配置
+cors:
+  allow_origin: "*"
+  allow_methods: "GET, OPTIONS"
+  allow_headers: "Content-Type"
+
 # 多个 Docker 实例连接配置 (支持本地、远程和加密远程连接)
 docker_engines:
   - name: "local"
