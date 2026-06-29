@@ -11,9 +11,8 @@ import (
 	"sync"
 	"time"
 
-	mobycontainer "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
-	"github.com/moby/moby/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
 	"docker-dev-panel/config"
 	"docker-dev-panel/logger"
 	"docker-dev-panel/models"
@@ -366,15 +365,18 @@ func (s *DockerService) getEngineWorkspaces(ctx context.Context, cli *client.Cli
 // ContainerAction 执行容器操作 (start, stop, restart)
 func (s *DockerService) ContainerAction(ctx context.Context, id string, action string) error {
 	for _, clientInfo := range s.clients {
-		_, err := clientInfo.Cli.ContainerInspect(ctx, id)
+		_, err := clientInfo.Cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 		if err == nil {
 			switch action {
 			case "start":
-				return clientInfo.Cli.ContainerStart(ctx, id, mobycontainer.StartOptions{})
+				_, err = clientInfo.Cli.ContainerStart(ctx, id, client.ContainerStartOptions{})
+				return err
 			case "stop":
-				return clientInfo.Cli.ContainerStop(ctx, id, mobycontainer.StopOptions{})
+				_, err = clientInfo.Cli.ContainerStop(ctx, id, client.ContainerStopOptions{})
+				return err
 			case "restart":
-				return clientInfo.Cli.ContainerRestart(ctx, id, mobycontainer.StopOptions{})
+				_, err = clientInfo.Cli.ContainerRestart(ctx, id, client.ContainerRestartOptions{})
+				return err
 			default:
 				return fmt.Errorf("不支持的容器操作: %s", action)
 			}
@@ -386,9 +388,9 @@ func (s *DockerService) ContainerAction(ctx context.Context, id string, action s
 // ContainerLogs 获取容器日志内容
 func (s *DockerService) ContainerLogs(ctx context.Context, id string, tail string) (string, error) {
 	for _, clientInfo := range s.clients {
-		inspect, err := clientInfo.Cli.ContainerInspect(ctx, id)
+		inspect, err := clientInfo.Cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 		if err == nil {
-			reader, err := clientInfo.Cli.ContainerLogs(ctx, id, mobycontainer.LogsOptions{
+			reader, err := clientInfo.Cli.ContainerLogs(ctx, id, client.ContainerLogsOptions{
 				ShowStdout: true,
 				ShowStderr: true,
 				Tail:       tail,
@@ -399,7 +401,7 @@ func (s *DockerService) ContainerLogs(ctx context.Context, id string, tail strin
 			}
 			defer reader.Close()
 
-			if inspect.Config.Tty {
+			if inspect.Container.Config.Tty {
 				var buf strings.Builder
 				_, err = io.Copy(&buf, reader)
 				if err != nil && err != io.EOF {
@@ -430,19 +432,19 @@ func (s *DockerService) ContainerLogs(ctx context.Context, id string, tail strin
 // ContainerExec 在指定容器中执行命令并返回结果
 func (s *DockerService) ContainerExec(ctx context.Context, id string, cmd []string) (string, string, int, error) {
 	for _, clientInfo := range s.clients {
-		_, err := clientInfo.Cli.ContainerInspect(ctx, id)
+		_, err := clientInfo.Cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 		if err == nil {
-			execConfig := mobycontainer.ExecOptions{
+			execConfig := client.ExecCreateOptions{
 				Cmd:          cmd,
 				AttachStdout: true,
 				AttachStderr: true,
 			}
-			execID, err := clientInfo.Cli.ContainerExecCreate(ctx, id, execConfig)
+			execID, err := clientInfo.Cli.ExecCreate(ctx, id, execConfig)
 			if err != nil {
 				return "", "", 0, err
 			}
 
-			resp, err := clientInfo.Cli.ContainerExecAttach(ctx, execID.ID, mobycontainer.ExecStartOptions{})
+			resp, err := clientInfo.Cli.ExecAttach(ctx, execID.ID, client.ExecAttachOptions{})
 			if err != nil {
 				return "", "", 0, err
 			}
@@ -455,7 +457,7 @@ func (s *DockerService) ContainerExec(ctx context.Context, id string, cmd []stri
 				// ignore error
 			}
 
-			inspectResp, err := clientInfo.Cli.ContainerExecInspect(ctx, execID.ID)
+			inspectResp, err := clientInfo.Cli.ExecInspect(ctx, execID.ID, client.ExecInspectOptions{})
 			exitCode := 0
 			if err == nil {
 				exitCode = inspectResp.ExitCode
