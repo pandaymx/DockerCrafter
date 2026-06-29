@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dockercrafter-backend
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # We do NOT publish the port 12581 to the host to keep it secure.
+    # Nginx in the frontend container will proxy to it via the internal network.
+    networks:
+      - dockercrafter-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dockercrafter-frontend
+    restart: always
+    ports:
+      - "12580:80"
+    depends_on:
+      - backend
+    networks:
+      - dockercrafter-net
+
+networks:
+  dockercrafter-net:
+    driver: bridge
