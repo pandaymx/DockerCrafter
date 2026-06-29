@@ -80,6 +80,31 @@ func (s *DockerService) Close() {
 	}
 }
 
+// Ping 尝试 Ping 所有已连接的 Docker 引擎，只要有任意一个返回成功即返回 true
+func (s *DockerService) Ping(ctx context.Context) bool {
+	var wg sync.WaitGroup
+	var once sync.Once
+	connected := false
+
+	for _, c := range s.clients {
+		wg.Add(1)
+		go func(cli *client.Client) {
+			defer wg.Done()
+			pingCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+			defer cancel()
+
+			if _, err := cli.Ping(pingCtx, client.PingOptions{}); err == nil {
+				once.Do(func() {
+					connected = true
+				})
+			}
+		}(c.Cli)
+	}
+
+	wg.Wait()
+	return connected
+}
+
 // DockerStats 用于解析 Docker API 返回的容器监控指标 JSON
 type DockerStats struct {
 	CPUStats struct {

@@ -37,8 +37,16 @@ func LoadConfig() *Config {
 	var engines []DockerEngineConfig
 	var corsCfg CorsConfig
 
-	// 2. 尝试从 YAML 配置文件中读取
+	// 2. 尝试从 YAML 配置文件中读取 (支持向上探测查找 config.yaml)
 	configFile := "config.yaml"
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		if _, err := os.Stat("../config.yaml"); err == nil {
+			configFile = "../config.yaml"
+		} else if _, err := os.Stat("../../config.yaml"); err == nil {
+			configFile = "../../config.yaml"
+		}
+	}
+
 	if yamlData, err := os.ReadFile(configFile); err == nil {
 		var yamlCfg Config
 		if err := yaml.Unmarshal(yamlData, &yamlCfg); err == nil {
