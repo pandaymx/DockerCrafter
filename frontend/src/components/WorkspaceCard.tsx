@@ -10,10 +10,10 @@ interface WorkspaceCardProps {
   onToggleCollapse?: () => void;
   onBatchStart?: (projectName: string) => void;
   onBatchStop?: (projectName: string) => void;
-  onContainerStart?: (name: string) => void;
-  onContainerStop?: (name: string) => void;
-  onContainerRestart?: (name: string) => void;
-  onContainerLogs?: (name: string) => void;
+  onContainerStart?: (id: string, name: string) => void;
+  onContainerStop?: (id: string, name: string) => void;
+  onContainerRestart?: (id: string, name: string) => void;
+  onContainerLogs?: (id: string, name: string) => void;
 }
 
 export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
