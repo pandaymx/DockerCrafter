@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,7 +11,9 @@ import (
 	"sync"
 	"time"
 
+	mobycontainer "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+	"github.com/moby/moby/pkg/stdcopy"
 	"docker-dev-panel/config"
 	"docker-dev-panel/logger"
 	"docker-dev-panel/models"
@@ -359,3 +362,108 @@ func (s *DockerService) getEngineWorkspaces(ctx context.Context, cli *client.Cli
 
 	return workspaces, nil
 }
+
+// ContainerAction 执行容器操作 (start, stop, restart)
+func (s *DockerService) ContainerAction(ctx context.Context, id string, action string) error {
+	for _, clientInfo := range s.clients {
+		_, err := clientInfo.Cli.ContainerInspect(ctx, id)
+		if err == nil {
+			switch action {
+			case "start":
+				return clientInfo.Cli.ContainerStart(ctx, id, mobycontainer.StartOptions{})
+			case "stop":
+				return clientInfo.Cli.ContainerStop(ctx, id, mobycontainer.StopOptions{})
+			case "restart":
+				return clientInfo.Cli.ContainerRestart(ctx, id, mobycontainer.StopOptions{})
+			default:
+				return fmt.Errorf("不支持的容器操作: %s", action)
+			}
+		}
+	}
+	return fmt.Errorf("未找到容器: %s", id)
+}
+
+// ContainerLogs 获取容器日志内容
+func (s *DockerService) ContainerLogs(ctx context.Context, id string, tail string) (string, error) {
+	for _, clientInfo := range s.clients {
+		inspect, err := clientInfo.Cli.ContainerInspect(ctx, id)
+		if err == nil {
+			reader, err := clientInfo.Cli.ContainerLogs(ctx, id, mobycontainer.LogsOptions{
+				ShowStdout: true,
+				ShowStderr: true,
+				Tail:       tail,
+				Timestamps: false,
+			})
+			if err != nil {
+				return "", err
+			}
+			defer reader.Close()
+
+			if inspect.Config.Tty {
+				var buf strings.Builder
+				_, err = io.Copy(&buf, reader)
+				if err != nil && err != io.EOF {
+					return "", err
+				}
+				return buf.String(), nil
+			} else {
+				var stdoutBuf bytes.Buffer
+				var stderrBuf bytes.Buffer
+				_, err = stdcopy.StdCopy(&stdoutBuf, &stderrBuf, reader)
+				if err != nil && err != io.EOF {
+					// Fallback to direct copy if stdcopy returns error
+					var fallbackBuf strings.Builder
+					_, _ = io.Copy(&fallbackBuf, reader)
+					return fallbackBuf.String(), nil
+				}
+				combined := stdoutBuf.String()
+				if stderrBuf.Len() > 0 {
+					combined += "\n--- STDERR ---\n" + stderrBuf.String()
+				}
+				return combined, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("未找到容器: %s", id)
+}
+
+// ContainerExec 在指定容器中执行命令并返回结果
+func (s *DockerService) ContainerExec(ctx context.Context, id string, cmd []string) (string, string, int, error) {
+	for _, clientInfo := range s.clients {
+		_, err := clientInfo.Cli.ContainerInspect(ctx, id)
+		if err == nil {
+			execConfig := mobycontainer.ExecOptions{
+				Cmd:          cmd,
+				AttachStdout: true,
+				AttachStderr: true,
+			}
+			execID, err := clientInfo.Cli.ContainerExecCreate(ctx, id, execConfig)
+			if err != nil {
+				return "", "", 0, err
+			}
+
+			resp, err := clientInfo.Cli.ContainerExecAttach(ctx, execID.ID, mobycontainer.ExecStartOptions{})
+			if err != nil {
+				return "", "", 0, err
+			}
+			defer resp.Close()
+
+			var stdoutBuf bytes.Buffer
+			var stderrBuf bytes.Buffer
+			_, err = stdcopy.StdCopy(&stdoutBuf, &stderrBuf, resp.Reader)
+			if err != nil && err != io.EOF {
+				// ignore error
+			}
+
+			inspectResp, err := clientInfo.Cli.ContainerExecInspect(ctx, execID.ID)
+			exitCode := 0
+			if err == nil {
+				exitCode = inspectResp.ExitCode
+			}
+
+			return stdoutBuf.String(), stderrBuf.String(), exitCode, nil
+		}
+	}
+	return "", "", 0, fmt.Errorf("未找到容器: %s", id)
+}
+

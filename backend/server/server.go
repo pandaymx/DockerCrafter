@@ -29,6 +29,9 @@ func (s *Server) Start() error {
 	// 注册路由处理器
 	http.HandleFunc("/api/health", s.handleHealth)
 	http.HandleFunc("/api/projects", s.handleProjects)
+	http.HandleFunc("/api/containers/action", s.handleContainerAction)
+	http.HandleFunc("/api/containers/logs", s.handleContainerLogs)
+	http.HandleFunc("/api/containers/exec", s.handleContainerExec)
 
 	addr := ":" + s.cfg.Port
 	logger.Infof("🚀 后端服务已启动，监听地址为 http://localhost%s (日志级别: %s)", addr, s.cfg.LogLevel)
@@ -99,4 +102,140 @@ func (s *Server) handleProjects(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(workspaces); err != nil {
 		logger.Errorf("JSON 编码失败: %v", err)
 	}
+}
+
+// handleContainerAction 执行容器启动、停止或重启操作
+func (s *Server) handleContainerAction(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", s.cfg.CORS.AllowOrigin)
+	w.Header().Set("Access-Control-Allow-Methods", s.cfg.CORS.AllowMethods)
+	w.Header().Set("Access-Control-Allow-Headers", s.cfg.CORS.AllowHeaders)
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "仅支持 POST 请求", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ID     string `json:"id"`
+		Action string `json:"action"` // start, stop, restart
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "无效的 JSON 请求体", http.StatusBadRequest)
+		return
+	}
+
+	if req.ID == "" || req.Action == "" {
+		http.Error(w, "缺少必要参数 id 或 action", http.StatusBadRequest)
+		return
+	}
+
+	logger.Infof("执行容器操作: id=%s, action=%s", req.ID, req.Action)
+
+	err := s.dockerService.ContainerAction(r.Context(), req.ID, req.Action)
+	if err != nil {
+		logger.Errorf("容器操作失败: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+
+// handleContainerLogs 获取容器日志
+func (s *Server) handleContainerLogs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", s.cfg.CORS.AllowOrigin)
+	w.Header().Set("Access-Control-Allow-Methods", s.cfg.CORS.AllowMethods)
+	w.Header().Set("Access-Control-Allow-Headers", s.cfg.CORS.AllowHeaders)
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != "GET" {
+		http.Error(w, "仅支持 GET 请求", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	tail := r.URL.Query().Get("tail")
+	if id == "" {
+		http.Error(w, "缺少必要参数 id", http.StatusBadRequest)
+		return
+	}
+	if tail == "" {
+		tail = "100" // 默认返回 100 行日志
+	}
+
+	logger.Debugf("获取容器日志: id=%s, tail=%s", id, tail)
+
+	logs, err := s.dockerService.ContainerLogs(r.Context(), id, tail)
+	if err != nil {
+		logger.Errorf("获取容器日志失败: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]string{"logs": logs})
+}
+
+// handleContainerExec 在容器内执行命令
+func (s *Server) handleContainerExec(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", s.cfg.CORS.AllowOrigin)
+	w.Header().Set("Access-Control-Allow-Methods", s.cfg.CORS.AllowMethods)
+	w.Header().Set("Access-Control-Allow-Headers", s.cfg.CORS.AllowHeaders)
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "仅支持 POST 请求", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ID  string   `json:"id"`
+		Cmd []string `json:"cmd"` // 比如 ["ls", "-la"]
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "无效的 JSON 请求体", http.StatusBadRequest)
+		return
+	}
+
+	if req.ID == "" || len(req.Cmd) == 0 {
+		http.Error(w, "缺少必要参数 id 或 cmd", http.StatusBadRequest)
+		return
+	}
+
+	logger.Infof("执行容器内命令: id=%s, cmd=%v", req.ID, req.Cmd)
+
+	stdout, stderr, exitCode, err := s.dockerService.ContainerExec(r.Context(), req.ID, req.Cmd)
+	if err != nil {
+		logger.Errorf("容器执行命令失败: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"stdout":   stdout,
+		"stderr":   stderr,
+		"exitCode": exitCode,
+	})
+}
 }
