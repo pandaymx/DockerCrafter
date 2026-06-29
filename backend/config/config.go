@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"gopkg.in/yaml.v3"
+	"docker-dev-panel/logger"
 )
 
 // DockerEngineConfig 保存单个 Docker 守护进程的连接配置
@@ -25,15 +26,17 @@ type CorsConfig struct {
 // Config 保存应用程序的全局配置信息
 type Config struct {
 	Port          string               `yaml:"port"`
+	LogLevel      string               `yaml:"log_level"`
 	DockerEngines []DockerEngineConfig `yaml:"docker_engines"`
 	CORS          CorsConfig           `yaml:"cors"`
 }
 
 // LoadConfig 级联加载配置，优先级为：
-// 命令行参数 (-port) > 环境变量 (PORT) > 配置文件 (config.yaml) > 默认值 (12581)
+// 命令行参数 (-port, -log-level) > 环境变量 (PORT, LOG_LEVEL) > 配置文件 (config.yaml) > 默认值
 func LoadConfig() *Config {
 	// 1. 设置默认值
 	resolvedPort := "12581"
+	resolvedLogLevel := "INFO"
 	var engines []DockerEngineConfig
 	var corsCfg CorsConfig
 
@@ -53,6 +56,9 @@ func LoadConfig() *Config {
 			if yamlCfg.Port != "" {
 				resolvedPort = yamlCfg.Port
 			}
+			if yamlCfg.LogLevel != "" {
+				resolvedLogLevel = yamlCfg.LogLevel
+			}
 			engines = yamlCfg.DockerEngines
 			corsCfg = yamlCfg.CORS
 		}
@@ -62,14 +68,22 @@ func LoadConfig() *Config {
 	if envPort := os.Getenv("PORT"); envPort != "" {
 		resolvedPort = envPort
 	}
+	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
+		resolvedLogLevel = envLogLevel
+	}
 
 	// 4. 尝试从命令行参数读取并覆盖
 	var flagPort string
+	var flagLogLevel string
 	flag.StringVar(&flagPort, "port", "", "HTTP port to listen on")
+	flag.StringVar(&flagLogLevel, "log-level", "", "Logging level (DEBUG, INFO, WARN, ERROR)")
 	flag.Parse()
 
 	if flagPort != "" {
 		resolvedPort = flagPort
+	}
+	if flagLogLevel != "" {
+		resolvedLogLevel = flagLogLevel
 	}
 
 	// 5. 设置默认 Docker 引擎（如果配置文件中没有定义任何 Docker 实例）
@@ -93,8 +107,12 @@ func LoadConfig() *Config {
 		corsCfg.AllowHeaders = "Content-Type"
 	}
 
+	// 7. 初始化全局日志级别
+	logger.SetLevel(resolvedLogLevel)
+
 	return &Config{
 		Port:          resolvedPort,
+		LogLevel:      logger.GetLevelString(),
 		DockerEngines: engines,
 		CORS:          corsCfg,
 	}
