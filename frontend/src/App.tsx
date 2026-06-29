@@ -18,7 +18,7 @@ export default function App() {
 
   // 轮询数据
   const fetchData = () => {
-    fetch("http://localhost:12581/api/projects")
+    fetch("/api/projects")
       .then((res) => res.json())
       .then((data) => {
         setWorkspaces(data || []);
