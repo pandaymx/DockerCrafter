@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import type { ProjectWorkspace } from './types';
 import { formatBytes } from './utils/format';
 import { WorkspaceCard } from './components/WorkspaceCard';
+import { LogsModal } from './components/LogsModal';
 import { useTranslation } from 'react-i18next';
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
   const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Record<string, boolean>>({});
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>("");
+  const [selectedLogContainer, setSelectedLogContainer] = useState<{ id: string, name: string } | null>(null);
 
   // 轮询数据
   const fetchData = () => {
@@ -415,13 +417,21 @@ export default function App() {
                 onContainerStart={(name) => showToast(t('toast.containerStart', { name }))}
                 onContainerStop={(name) => showToast(t('toast.containerStop', { name }))}
                 onContainerRestart={(name) => showToast(t('toast.containerRestart', { name }))}
-                onContainerLogs={() => showToast(t('toast.backendUpgradeTip'))}
+                onContainerLogs={(id, name) => setSelectedLogContainer({ id, name })}
               />
             ))}
           </div>
         )}
 
       </div>
+
+      {selectedLogContainer && (
+        <LogsModal
+          containerId={selectedLogContainer.id}
+          containerName={selectedLogContainer.name}
+          onClose={() => setSelectedLogContainer(null)}
+        />
+      )}
     </div>
   );
 }

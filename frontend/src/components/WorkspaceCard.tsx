@@ -13,7 +13,7 @@ interface WorkspaceCardProps {
   onContainerStart?: (name: string) => void;
   onContainerStop?: (name: string) => void;
   onContainerRestart?: (name: string) => void;
-  onContainerLogs?: (name: string) => void;
+  onContainerLogs?: (id: string, name: string) => void;
 }
 
 export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({

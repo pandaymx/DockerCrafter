@@ -9,7 +9,7 @@ interface ContainerCardProps {
   onStart?: (name: string) => void;
   onStop?: (name: string) => void;
   onRestart?: (name: string) => void;
-  onLogs?: (name: string) => void;
+  onLogs?: (id: string, name: string) => void;
 }
 
 export const ContainerCard: React.FC<ContainerCardProps> = ({
@@ -68,7 +68,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
               🔄
             </button>
             <button
-              onClick={() => onLogs?.(container.name)}
+              onClick={() => onLogs?.(container.id, container.name)}
               title={t('container.logs')}
               className="p-1 hover:text-blue-400 hover:bg-slate-700 rounded transition font-mono text-xs"
             >
