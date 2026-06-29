@@ -1,0 +1,131 @@
+// src/components/WorkspaceCard.tsx
+import React from 'react';
+import type { ProjectWorkspace } from '../types';
+import { ContainerCard } from './ContainerCard';
+
+interface WorkspaceCardProps {
+  workspace: ProjectWorkspace;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+  onBatchStart?: (projectName: string) => void;
+  onBatchStop?: (projectName: string) => void;
+  onContainerStart?: (name: string) => void;
+  onContainerStop?: (name: string) => void;
+  onContainerRestart?: (name: string) => void;
+  onContainerLogs?: (name: string) => void;
+}
+
+export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
+  workspace,
+  isCollapsed = false,
+  onToggleCollapse,
+  onBatchStart,
+  onBatchStop,
+  onContainerStart,
+  onContainerStop,
+  onContainerRestart,
+  onContainerLogs,
+}) => {
+  const runningCount = workspace.containers.filter((c) => c.state === 'running').length;
+
+  return (
+    <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-md flex flex-col justify-between h-full">
+      <div>
+        {/* Workspace header */}
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+          <div
+            className="flex items-center gap-2.5 min-w-0 cursor-pointer select-none group"
+            onClick={onToggleCollapse}
+          >
+            <span className="text-xl shrink-0 group-hover:scale-110 transition-transform">
+              {workspace.isCompose ? '📁' : '📦'}
+            </span>
+            <div className="min-w-0">
+              <h3 className="font-bold text-slate-100 tracking-wide text-base uppercase font-mono truncate group-hover:text-blue-400 transition-colors">
+                {workspace.projectName}
+              </h3>
+              <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono mt-0.5">
+                <span>SERVICES: {workspace.containers.length} / RUNNING: {runningCount}</span>
+                {workspace.engineName && (
+                  <span className="text-cyan-400 bg-cyan-950/20 px-1.5 py-0.2 rounded text-[9px] shrink-0">
+                    ⚙️ {workspace.engineName}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Batch actions */}
+            <div className="flex items-center gap-1 bg-slate-950/40 p-0.5 rounded-lg border border-slate-800/40">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBatchStart?.(workspace.projectName);
+                }}
+                title="启动工作区所有容器"
+                className="p-1 hover:text-emerald-400 hover:bg-slate-800 rounded transition text-xs"
+              >
+                ▶️
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBatchStop?.(workspace.projectName);
+                }}
+                title="停止工作区所有容器"
+                className="p-1 hover:text-rose-400 hover:bg-slate-800 rounded transition text-xs"
+              >
+                ⏹️
+              </button>
+            </div>
+
+            <span className="hidden sm:inline text-[10px] bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700/50 font-mono">
+              {workspace.isCompose ? 'Compose Project' : 'Standalone'}
+            </span>
+
+            {/* Collapse toggle */}
+            <button
+              onClick={onToggleCollapse}
+              className="text-slate-400 hover:text-slate-200 transition-colors p-1 hover:bg-slate-800/50 rounded"
+              title={isCollapsed ? '展开工作区' : '折叠工作区'}
+            >
+              <svg
+                className={`h-4 w-4 transform transition-transform duration-200 ${
+                  isCollapsed ? 'rotate-90' : 'rotate-180'
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Containers grid list */}
+        {!isCollapsed && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {workspace.containers.map((container) => (
+              <ContainerCard
+                key={container.id}
+                container={container}
+                onStart={onContainerStart}
+                onStop={onContainerStop}
+                onRestart={onContainerRestart}
+                onLogs={onContainerLogs}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Workspace footer */}
+      <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mt-4 pt-3 border-t border-slate-800/60">
+        <div>TOTAL SERVICES: {workspace.containers.length}</div>
+        <div className="flex items-center gap-1">📍 LOCAL ENVIRONMENT</div>
+      </div>
+    </div>
+  );
+};
