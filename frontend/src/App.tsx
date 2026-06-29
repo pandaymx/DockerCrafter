@@ -136,7 +136,7 @@ export default function App() {
   if (loading && workspaces.length === 0) {
     return (
       <div className="flex h-screen flex-col items-center justify-center bg-slate-950 text-slate-400 gap-4">
-        <svg className="animate-spin h-10 w-10 text-cyan-500" fill="none" viewBox="0 0 24 24">
+        <svg width="40" height="40" className="animate-spin h-10 w-10 text-cyan-500" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
@@ -151,7 +151,7 @@ export default function App() {
       {/* Toast 弹出提示层 */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 glass-panel bg-slate-900 border-cyan-500/30 text-cyan-400 px-4 py-3 rounded-lg shadow-2xl flex items-center gap-3 animate-bounce">
-          <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg width="20" height="20" className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span className="text-sm font-medium">{toastMessage}</span>
@@ -186,7 +186,7 @@ export default function App() {
               <h3 className="text-2xl font-bold mt-1 text-indigo-400">{stats.totalWorkspaces}</h3>
             </div>
             <div className="p-2.5 bg-indigo-500/10 rounded-lg text-indigo-400">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg width="20" height="20" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
             </div>
@@ -199,7 +199,7 @@ export default function App() {
                 <h3 className="text-2xl font-bold mt-1">{stats.totalContainers}</h3>
               </div>
               <div className="p-2.5 bg-emerald-500/10 rounded-lg text-emerald-400">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg width="20" height="20" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
               </div>
@@ -225,7 +225,7 @@ export default function App() {
                 <h3 className="text-2xl font-bold mt-1 text-cyan-400">{stats.totalCPU.toFixed(1)}%</h3>
               </div>
               <div className="p-2.5 bg-cyan-500/10 rounded-lg text-cyan-400">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg width="20" height="20" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
@@ -249,7 +249,7 @@ export default function App() {
                 <h3 className="text-2xl font-bold mt-1 text-purple-400">{formatBytes(stats.totalMemory)}</h3>
               </div>
               <div className="p-2.5 bg-purple-500/10 rounded-lg text-purple-400">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg width="20" height="20" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
                 </svg>
               </div>
@@ -273,7 +273,7 @@ export default function App() {
           {/* 搜索框 */}
           <div className="relative w-full lg:w-96">
             <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg width="20" height="20" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </span>
@@ -289,7 +289,7 @@ export default function App() {
                 onClick={() => setSearchQuery("")}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg width="16" height="16" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />
                 </svg>
               </button>
@@ -363,7 +363,7 @@ export default function App() {
         {/* 项目/工作区看板列表 */}
         {processedWorkspaces.length === 0 ? (
           <div className="glass-panel rounded-2xl p-16 text-center text-slate-500">
-            <svg className="mx-auto h-12 w-12 text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg width="48" height="48" className="mx-auto h-12 w-12 text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p className="text-base font-medium text-slate-400">没有找到匹配的工作区或容器</p>

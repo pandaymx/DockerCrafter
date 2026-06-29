@@ -91,6 +91,8 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
               title={isCollapsed ? '展开工作区' : '折叠工作区'}
             >
               <svg
+                width="16"
+                height="16"
                 className={`h-4 w-4 transform transition-transform duration-200 ${
                   isCollapsed ? 'rotate-90' : 'rotate-180'
                 }`}
