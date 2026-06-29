@@ -238,4 +238,3 @@ func (s *Server) handleContainerExec(w http.ResponseWriter, r *http.Request) {
 		"exitCode": exitCode,
 	})
 }
-}
