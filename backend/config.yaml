@@ -1,2 +1,17 @@
 # Docker Dev Panel Backend Configuration
 port: "12581"
+
+# 多个 Docker 实例连接配置 (支持本地、远程和加密远程连接)
+docker_engines:
+  - name: "local"
+    host: ""             # 为空时表示自动识别本地环境 (WSL2 / Unix Socket / Named Pipe)
+
+  # 远程 Docker 守护进程配置示例（按需取消注释并配置）
+  # - name: "remote-dev"
+  #   host: "tcp://192.168.1.100:2375"
+  #   tls_verify: false
+
+  # - name: "remote-prod"
+  #   host: "tcp://192.168.1.200:2376"
+  #   tls_verify: true
+  #   cert_path: "/home/panda/certs/prod" # 包含 ca.pem, cert.pem, key.pem 证书

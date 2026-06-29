@@ -18,4 +18,5 @@ type ProjectWorkspace struct {
 	ProjectName string          `json:"projectName"` // 来自 com.docker.compose.project 或自定义
 	IsCompose   bool            `json:"isCompose"`
 	Containers  []ContainerInfo `json:"containers"`
+	EngineName  string          `json:"engineName"`  // 所属 Docker 引擎的名称
 }

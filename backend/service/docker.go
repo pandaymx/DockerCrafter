@@ -6,22 +6,78 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/moby/moby/client"
+	"docker-dev-panel/config"
 	"docker-dev-panel/models"
 )
 
-// DockerService 封装 Docker SDK 操作和服务
-type DockerService struct {
-	cli *client.Client
+// DockerClientInfo 存储每个 Docker 客户端实例和别名
+type DockerClientInfo struct {
+	Name string
+	Cli  *client.Client
 }
 
-// NewDockerService 创建一个 DockerService 实例
-func NewDockerService(cli *client.Client) *DockerService {
-	return &DockerService{cli: cli}
+// DockerService 封装了多个 Docker 守护进程的连接和操作
+type DockerService struct {
+	clients []DockerClientInfo
+}
+
+// NewDockerService 创建并初始化多个 Docker 客户端连接
+func NewDockerService(engineConfigs []config.DockerEngineConfig) (*DockerService, error) {
+	var clients []DockerClientInfo
+
+	for _, ec := range engineConfigs {
+		var opts []client.Opt
+
+		if ec.Host == "" {
+			// 本地 Docker，使用 FromEnv 自动探测
+			opts = append(opts, client.FromEnv)
+		} else {
+			// 远程 Docker
+			opts = append(opts, client.WithHost(ec.Host))
+
+			// TLS 加密支持
+			if ec.TLSVerify && ec.CertPath != "" {
+				caFile := filepath.Join(ec.CertPath, "ca.pem")
+				certFile := filepath.Join(ec.CertPath, "cert.pem")
+				keyFile := filepath.Join(ec.CertPath, "key.pem")
+				opts = append(opts, client.WithTLSClientConfig(caFile, certFile, keyFile))
+			}
+		}
+
+		opts = append(opts, client.WithAPIVersionNegotiation())
+
+		cli, err := client.NewClientWithOpts(opts...)
+		if err != nil {
+			log.Printf("⚠️ 警告：连接 Docker 实例 [%s] 失败: %v", ec.Name, err)
+			continue
+		}
+
+		clients = append(clients, DockerClientInfo{
+			Name: ec.Name,
+			Cli:  cli,
+		})
+	}
+
+	if len(clients) == 0 {
+		return nil, fmt.Errorf("没有成功初始化任何 Docker 引擎连接")
+	}
+
+	return &DockerService{clients: clients}, nil
+}
+
+// Close 关闭所有的 Docker 客户端连接
+func (s *DockerService) Close() {
+	for _, c := range s.clients {
+		if err := c.Cli.Close(); err != nil {
+			log.Printf("⚠️ 关闭 Docker 实例 [%s] 客户端连接失败: %v", c.Name, err)
+		}
+	}
 }
 
 // DockerStats 用于解析 Docker API 返回的容器监控指标 JSON
@@ -79,12 +135,12 @@ func calculateMemoryUsage(stats *DockerStats) int64 {
 }
 
 // fetchContainerStats 异步抓取单个容器的性能指标
-func (s *DockerService) fetchContainerStats(ctx context.Context, containerID string) (float64, int64, error) {
+func (s *DockerService) fetchContainerStats(ctx context.Context, cli *client.Client, containerID string) (float64, int64, error) {
 	// 设置 2 秒超时以防 Docker 守护进程无响应
 	ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	resp, err := s.cli.ContainerStats(ctxTimeout, containerID, client.ContainerStatsOptions{
+	resp, err := cli.ContainerStats(ctxTimeout, containerID, client.ContainerStatsOptions{
 		Stream:                false,
 		IncludePreviousSample: true,
 	})
@@ -114,7 +170,7 @@ type containerStatsResult struct {
 }
 
 // fetchAllContainerStats 并发抓取所有容器的指标
-func (s *DockerService) fetchAllContainerStats(ctx context.Context, containerIDs []string) map[string]containerStatsResult {
+func (s *DockerService) fetchAllContainerStats(ctx context.Context, cli *client.Client, containerIDs []string) map[string]containerStatsResult {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	results := make(map[string]containerStatsResult)
@@ -123,7 +179,7 @@ func (s *DockerService) fetchAllContainerStats(ctx context.Context, containerIDs
 		wg.Add(1)
 		go func(containerID string) {
 			defer wg.Done()
-			cpu, mem, err := s.fetchContainerStats(ctx, containerID)
+			cpu, mem, err := s.fetchContainerStats(ctx, cli, containerID)
 			if err != nil {
 				log.Printf("⚠️ 抓取容器 [%s] 监控指标失败: %v", containerID, err)
 				return
@@ -141,10 +197,41 @@ func (s *DockerService) fetchAllContainerStats(ctx context.Context, containerIDs
 	return results
 }
 
-// GetProjectWorkspaces 获取所有的项目工作区和容器信息
+// GetProjectWorkspaces 获取所有实例下的项目工作区并进行整合
 func (s *DockerService) GetProjectWorkspaces(ctx context.Context) ([]models.ProjectWorkspace, error) {
-	// 1. 获取本地所有的容器列表
-	rawContainers, err := s.cli.ContainerList(ctx, client.ContainerListOptions{All: true})
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var allWorkspaces []models.ProjectWorkspace
+
+	for _, cInfo := range s.clients {
+		wg.Add(1)
+		go func(c DockerClientInfo) {
+			defer wg.Done()
+
+			// 为单个引擎的请求设置 3 秒的超时以防连接超时挂起整个服务
+			engineCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			defer cancel()
+
+			workspaces, err := s.getEngineWorkspaces(engineCtx, c.Cli, c.Name)
+			if err != nil {
+				log.Printf("⚠️ 获取 Docker 实例 [%s] 容器失败: %v", c.Name, err)
+				return
+			}
+
+			mu.Lock()
+			allWorkspaces = append(allWorkspaces, workspaces...)
+			mu.Unlock()
+		}(cInfo)
+	}
+
+	wg.Wait()
+	return allWorkspaces, nil
+}
+
+// getEngineWorkspaces 抓取并解析单个 Docker 客户端的容器
+func (s *DockerService) getEngineWorkspaces(ctx context.Context, cli *client.Client, engineName string) ([]models.ProjectWorkspace, error) {
+	// 1. 获取所有的容器列表
+	rawContainers, err := cli.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
 		return nil, fmt.Errorf("无法获取容器列表: %w", err)
 	}
@@ -158,7 +245,7 @@ func (s *DockerService) GetProjectWorkspaces(ctx context.Context) ([]models.Proj
 	}
 
 	// 3. 并发抓取性能指标
-	statsMap := s.fetchAllContainerStats(ctx, runningIDs)
+	statsMap := s.fetchAllContainerStats(ctx, cli, runningIDs)
 
 	// 4. 解析、格式化容器并归组到 Workspace 映射中
 	workspaceMap := make(map[string]*models.ProjectWorkspace)
@@ -217,6 +304,7 @@ func (s *DockerService) GetProjectWorkspaces(ctx context.Context) ([]models.Proj
 					ProjectName: composeProject,
 					IsCompose:   true,
 					Containers:  []models.ContainerInfo{},
+					EngineName:  engineName,
 				}
 				workspaceMap[composeProject] = ws
 			}
@@ -228,6 +316,7 @@ func (s *DockerService) GetProjectWorkspaces(ctx context.Context) ([]models.Proj
 					ProjectName: "独立容器（未归组）",
 					IsCompose:   false,
 					Containers:  []models.ContainerInfo{},
+					EngineName:  engineName,
 				}
 			}
 			standaloneWorkspace.Containers = append(standaloneWorkspace.Containers, info)
