@@ -1,6 +1,7 @@
 // src/components/ContainerCard.tsx
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { Play, Square, RefreshCw, Terminal } from 'lucide-react';
 import type { ContainerInfo } from '../types';
 import { formatBytes } from '../utils/format';
 
@@ -24,8 +25,10 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
 
   // Dynamic performance bar colors
   const cpuColor = container.cpuUsage > 80 ? 'bg-rose-500' : container.cpuUsage > 40 ? 'bg-amber-500' : 'bg-cyan-500';
-  const memMaxMock = 2 * 1024 * 1024 * 1024; // 2GB assumed limit for visualization
-  const memPercentage = Math.min((container.memoryUsage / memMaxMock) * 100, 100);
+
+  // Use memoryLimit if valid, fallback to 2GB for visualization if 0
+  const memLimit = container.memoryLimit > 0 ? container.memoryLimit : 2 * 1024 * 1024 * 1024;
+  const memPercentage = Math.min((container.memoryUsage / memLimit) * 100, 100);
   const memColor = memPercentage > 80 ? 'bg-rose-500' : memPercentage > 40 ? 'bg-amber-500' : 'bg-purple-500';
 
   return (
@@ -47,32 +50,32 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
               <button
                 onClick={() => onStop?.(container.id, container.name)}
                 title={t('container.stop')}
-                className="p-1 hover:text-rose-400 hover:bg-slate-700 rounded transition text-xs"
+                className="p-1 hover:text-rose-400 hover:bg-slate-700 rounded transition"
               >
-                ⏹️
+                <Square className="w-4 h-4" />
               </button>
             ) : (
               <button
                 onClick={() => onStart?.(container.id, container.name)}
                 title={t('container.start')}
-                className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition text-xs"
+                className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition"
               >
-                ▶️
+                <Play className="w-4 h-4" />
               </button>
             )}
             <button
               onClick={() => onRestart?.(container.id, container.name)}
               title={t('container.restart')}
-              className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition text-xs"
+              className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition"
             >
-              🔄
+              <RefreshCw className="w-4 h-4" />
             </button>
             <button
               onClick={() => onLogs?.(container.id, container.name)}
               title={t('container.logs')}
-              className="p-1 hover:text-blue-400 hover:bg-slate-700 rounded transition font-mono text-xs"
+              className="p-1 hover:text-blue-400 hover:bg-slate-700 rounded transition"
             >
-              &gt;_
+              <Terminal className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -97,7 +100,11 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
             <div>
               <div className="text-slate-400 mb-0.5 text-[10px]">MEM</div>
               <div className="text-slate-100 font-bold text-sm">
-                {isRunning ? formatBytes(container.memoryUsage) : '0 B'}
+                {isRunning ? (
+                  <span>
+                    {formatBytes(container.memoryUsage)} <span className="text-slate-500 font-normal text-xs">/ {formatBytes(memLimit)}</span>
+                  </span>
+                ) : '0 B'}
               </div>
             </div>
             {isRunning && (
