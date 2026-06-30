@@ -4,13 +4,14 @@ import { formatBytes } from './utils/format';
 import { WorkspaceCard } from './components/WorkspaceCard';
 import { LogsModal } from './components/LogsModal';
 import { TerminalModal } from './components/TerminalModal';
+import { LanguageSwitcher } from './components/LanguageSwitcher';
 import { useTranslation } from 'react-i18next';
 import { GlassPanel, ProgressBar } from './components/ui';
 import { cn } from './utils/cn';
 import { useDebounce } from './hooks/useDebounce';
 
 export default function App() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [workspaces, setWorkspaces] = useState<ProjectWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -244,34 +245,7 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             {/* 语言切换器 */}
-            <div className="flex items-center bg-slate-900/60 border border-slate-800 p-0.5 rounded-xl text-xs font-mono">
-              <button
-                onClick={() => {
-                  i18n.changeLanguage('zh');
-                  localStorage.setItem('docker-dev-panel-lang', 'zh');
-                }}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
-                  i18n.language === 'zh'
-                    ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 text-blue-400 font-bold'
-                    : 'border border-transparent text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                中文
-              </button>
-              <button
-                onClick={() => {
-                  i18n.changeLanguage('en');
-                  localStorage.setItem('docker-dev-panel-lang', 'en');
-                }}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
-                  i18n.language === 'en'
-                    ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 text-blue-400 font-bold'
-                    : 'border border-transparent text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                EN
-              </button>
-            </div>
+            <LanguageSwitcher showToast={showToast} />
             <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-mono">
               <div className="relative flex h-2.5 w-2.5 shrink-0 items-center justify-center">
                 <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-40 animate-pulse" />
