@@ -19,7 +19,7 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
   useEffect(() => {
     const fetchLogs = async () => {
       try {
-        const response = await fetch(`http://localhost:12581/api/containers/logs?id=${containerId}&tail=100`);
+        const response = await fetch(`/api/containers/logs?id=${containerId}&tail=100`);
         if (!response.ok) {
           throw new Error(`Error: ${response.status} ${response.statusText}`);
         }
