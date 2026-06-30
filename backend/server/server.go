@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -93,8 +94,15 @@ func (s *Server) Start() error {
 	http.HandleFunc("/api/containers/exec", s.corsMiddleware(s.handleContainerExec))
 	http.HandleFunc("/api/containers/exec/ws", s.corsMiddleware(s.handleContainerExecWS))
 
+	// 检测是否存在本地 dist 目录（前端静态资源托管）
+	if _, err := os.Stat("dist"); err == nil {
+		logger.Infof("📁 检测到本地 dist 目录，启用前端静态资源托管")
+		fs := http.FileServer(http.Dir("dist"))
+		http.Handle("/", fs)
+	}
+
 	addr := ":" + s.cfg.Port
-	logger.Infof("🚀 后端服务已启动，监听地址为 http://localhost%s (日志级别: %s)", addr, s.cfg.LogLevel)
+	logger.Infof("🚀 后端服务已启动，监听地址为 http://localhost%s (版本: %s, 日志级别: %s)", addr, config.Version, s.cfg.LogLevel)
 	logger.Infof("🔍 API 接口地址: http://localhost%s/api/projects", addr)
 	logger.Infof("🏥 健康检查地址: http://localhost%s/api/health", addr)
 

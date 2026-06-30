@@ -1,0 +1,126 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build Release Assets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            ext: tar.gz
+          - os: linux
+            arch: arm64
+            ext: tar.gz
+          - os: windows
+            arch: amd64
+            ext: zip
+          - os: darwin
+            arch: amd64
+            ext: tar.gz
+          - os: darwin
+            arch: arm64
+            ext: tar.gz
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: backend/go.sum
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Frontend Install and Build
+        working-directory: ./frontend
+        run: |
+          bun install
+          bun run build
+
+      - name: Go Download and Build
+        working-directory: ./backend
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          go mod download
+
+          VERSION=${GITHUB_REF#refs/tags/}
+
+          # 针对 Windows 特别处理文件扩展名
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            BIN_NAME="docker-crafter.exe"
+          else
+            BIN_NAME="docker-crafter"
+          fi
+
+          go build -ldflags="-s -w -X docker-dev-panel/config.Version=${VERSION}" -v -o "build/$BIN_NAME" ./cmd/server
+
+      - name: Package Assets
+        run: |
+          # 提取无 v 前缀的版本号
+          VERSION=${GITHUB_REF#refs/tags/}
+
+          ARCHIVE_NAME="docker-crafter_${VERSION}_${{ matrix.os }}_${{ matrix.arch }}"
+
+          # 创建打包目录
+          mkdir -p "pkg_temp"
+
+          # 将前端产物 dist 和后端二进制一起放入文件夹
+          cp -r frontend/dist pkg_temp/
+
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            cp backend/build/docker-crafter.exe pkg_temp/
+            cd pkg_temp
+            zip -r "../${ARCHIVE_NAME}.zip" ./*
+            cd ..
+          else
+            cp backend/build/docker-crafter pkg_temp/
+            cd pkg_temp
+            tar -czvf "../${ARCHIVE_NAME}.tar.gz" ./*
+            cd ..
+          fi
+
+      - name: Extract Release Notes
+        id: extract_notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION_CLEAN=${VERSION#v}
+          # Extract changelog block for the current version
+          awk -v ver="$VERSION_CLEAN" '
+            $0 ~ "^## \\["ver"\\]" || $0 ~ "^## "ver" " || $0 ~ "^## "ver"$" || $0 ~ "^# \\["ver"\\]" || $0 ~ "^# "ver" " || $0 ~ "^# "ver"$" {
+              flag=1
+              print
+              next
+            }
+            /^#+ / {
+              if (flag) {
+                flag=0
+              }
+            }
+            flag {
+              print
+            }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          echo "notes_file=RELEASE_NOTES.md" >> $GITHUB_OUTPUT
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: ${{ steps.extract_notes.outputs.notes_file }}
+          files: |
+            docker-crafter_*.tar.gz
+            docker-crafter_*.zip
