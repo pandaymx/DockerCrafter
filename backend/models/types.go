@@ -11,6 +11,7 @@ type ContainerInfo struct {
 	Labels      map[string]string `json:"labels"`
 	CpuUsage    float64           `json:"cpuUsage"`    // 实时百分比
 	MemoryUsage int64             `json:"memoryUsage"` // 字节数
+	MemoryLimit int64             `json:"memoryLimit"` // 内存限制 (或宿主机总内存)
 }
 
 // ProjectWorkspace 项目/业务维度的看板容器

@@ -8,6 +8,7 @@ export interface ContainerInfo {
   labels: Record<string, string>;
   cpuUsage: number;
   memoryUsage: number;
+  memoryLimit: number;
 }
 
 export interface ProjectWorkspace {
