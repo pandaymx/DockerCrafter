@@ -538,6 +538,12 @@ func (s *DockerService) ContainerExec(ctx context.Context, id string, cmd []stri
 }
 
 
+// LogMessage represents a structured log message sent over WebSocket
+type LogMessage struct {
+	Type string `json:"type"`
+	Data string `json:"data"`
+}
+
 // ContainerLogsStream 实时获取并流式返回容器日志内容
 func (s *DockerService) ContainerLogsStream(ctx context.Context, id string, tail string, conn interface { WriteMessage(messageType int, data []byte) error }) error {
 	for _, clientInfo := range s.clients {
@@ -570,7 +576,12 @@ func (s *DockerService) ContainerLogsStream(ctx context.Context, id string, tail
 				for {
 					n, err := reader.Read(buf)
 					if n > 0 {
-						if writeErr := conn.WriteMessage(1, buf[:n]); writeErr != nil {
+						msg := LogMessage{
+							Type: "stdout",
+							Data: string(buf[:n]),
+						}
+						jsonMsg, _ := json.Marshal(msg)
+						if writeErr := conn.WriteMessage(1, jsonMsg); writeErr != nil {
 							return writeErr
 						}
 					}
@@ -585,8 +596,8 @@ func (s *DockerService) ContainerLogsStream(ctx context.Context, id string, tail
 				// Use docker's stdcopy to demultiplex stdout and stderr
 				// StdCopy writes to io.Writer. We can create a custom writer that wraps the conn.WriteMessage.
 
-				stdoutWriter := &WSWriter{conn: conn}
-				stderrWriter := &WSWriter{conn: conn} // Could format differently if needed
+				stdoutWriter := &WSWriter{conn: conn, streamType: "stdout"}
+				stderrWriter := &WSWriter{conn: conn, streamType: "stderr"}
 
 				_, err = stdcopy.StdCopy(stdoutWriter, stderrWriter, reader)
 				if err != nil && err != io.EOF {
@@ -601,12 +612,22 @@ func (s *DockerService) ContainerLogsStream(ctx context.Context, id string, tail
 
 // WSWriter wraps a websocket connection to implement io.Writer
 type WSWriter struct {
-	conn interface { WriteMessage(messageType int, data []byte) error }
+	conn       interface { WriteMessage(messageType int, data []byte) error }
+	streamType string
 }
 
 // Write implements io.Writer for WSWriter
 func (w *WSWriter) Write(p []byte) (n int, err error) {
-	err = w.conn.WriteMessage(1, p)
+	msg := LogMessage{
+		Type: w.streamType,
+		Data: string(p),
+	}
+	jsonMsg, err := json.Marshal(msg)
+	if err != nil {
+		return 0, err
+	}
+
+	err = w.conn.WriteMessage(1, jsonMsg)
 	if err != nil {
 		return 0, err
 	}

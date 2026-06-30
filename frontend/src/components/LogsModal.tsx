@@ -7,9 +7,14 @@ interface LogsModalProps {
   onClose: () => void;
 }
 
+interface LogFragment {
+  type: string;
+  data: string;
+}
+
 export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName, onClose }) => {
   const { t } = useTranslation();
-  const [logs, setLogs] = useState<string>('');
+  const [logs, setLogs] = useState<LogFragment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [autoScroll, setAutoScroll] = useState<boolean>(true);
@@ -26,7 +31,7 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
     const connectWS = () => {
       if (ws) ws.close();
       setLoading(true);
-      setLogs(''); // Clear logs before reconnecting to prevent duplicating trailing logs
+      setLogs([]); // Clear logs before reconnecting to prevent duplicating trailing logs
 
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${protocol}//${window.location.host}/api/containers/logs/ws?id=${containerId}&tail=100`;
@@ -40,7 +45,33 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
       };
 
       ws.onmessage = (event) => {
-        setLogs((prev) => prev + event.data);
+        let newFragment: LogFragment;
+        try {
+          const parsed = JSON.parse(event.data);
+          newFragment = {
+            type: parsed.type || 'stdout',
+            data: parsed.data || '',
+          };
+        } catch {
+          // Fallback for non-JSON strings (e.g. legacy backend or errors)
+          newFragment = {
+            type: 'stdout',
+            data: event.data,
+          };
+        }
+
+        setLogs((prev) => {
+          if (prev.length === 0) return [newFragment];
+          const last = prev[prev.length - 1];
+          if (last.type === newFragment.type) {
+            // Merge chunks to reduce DOM size and rendering load
+            return [
+              ...prev.slice(0, prev.length - 1),
+              { type: last.type, data: last.data + newFragment.data },
+            ];
+          }
+          return [...prev, newFragment];
+        });
       };
 
       ws.onerror = () => {
@@ -130,9 +161,13 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
         <div className="relative flex-1 overflow-y-auto p-4 bg-zinc-950 max-h-[60vh] min-h-[40vh]">
           {error ? (
             <div className="text-rose-500 font-mono text-sm">{error}</div>
-          ) : logs ? (
-            <pre className="font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap break-all">
-              {logs}
+          ) : logs.length > 0 ? (
+            <pre className="font-mono text-xs leading-relaxed whitespace-pre-wrap break-all">
+              {logs.map((frag, idx) => (
+                <span key={idx} className={frag.type === 'stderr' ? 'text-rose-400' : 'text-zinc-300'}>
+                  {frag.data}
+                </span>
+              ))}
               <div ref={logEndRef} />
             </pre>
           ) : (
