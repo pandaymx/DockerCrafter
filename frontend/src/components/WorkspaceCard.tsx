@@ -148,7 +148,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
         {!isCollapsed && (
           <VirtualContainerList
             items={workspace.containers}
-            itemHeight={180}
+            itemHeight={240}
             maxHeight={600}
             renderItem={(container) => (
               <ContainerCard
