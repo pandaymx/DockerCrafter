@@ -1,3 +1,0 @@
-2026/06/30 10:02:07 [INFO] 🚀 后端服务已启动，监听地址为 http://localhost:12581 (日志级别: INFO)
-2026/06/30 10:02:07 [INFO] 🔍 API 接口地址: http://localhost:12581/api/projects
-2026/06/30 10:02:07 [INFO] 🏥 健康检查地址: http://localhost:12581/api/health
