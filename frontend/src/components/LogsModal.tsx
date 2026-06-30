@@ -40,6 +40,10 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
 
       ws.onopen = () => {
         setError(null);
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message || t('logsModal.fetchError'));
+      } finally {
         setLoading(false);
         retryCount = 0; // Reset retries on successful connection
       };
@@ -97,17 +101,13 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
       };
     };
 
-    connectWS();
+    // Initial fetch
+    fetchLogs();
 
-    return () => {
-      isMounted = false;
-      if (ws) {
-        ws.close();
-      }
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-      }
-    };
+    // Set up polling every 3 seconds
+    const intervalId = setInterval(fetchLogs, 3000);
+
+    return () => clearInterval(intervalId);
   }, [containerId, t]);
 
   useEffect(() => {

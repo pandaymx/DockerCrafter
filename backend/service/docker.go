@@ -179,7 +179,7 @@ func calculateMemoryUsage(stats *DockerStats) int64 {
 }
 
 // fetchContainerStats 异步抓取单个容器的性能指标
-func (s *DockerService) fetchContainerStats(ctx context.Context, cli *client.Client, containerID string) (float64, int64, int64, error) {
+func (s *DockerService) fetchContainerStats(ctx context.Context, cli *client.Client, containerID string) (float64, int64, error) {
 	// 设置 2 秒超时以防 Docker 守护进程无响应
 	ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
@@ -189,30 +189,28 @@ func (s *DockerService) fetchContainerStats(ctx context.Context, cli *client.Cli
 		IncludePreviousSample: true,
 	})
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, err
 	}
 	defer resp.Body.Close()
 
 	var stats DockerStats
 	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
 		if err == io.EOF {
-			return 0, 0, 0, nil
+			return 0, 0, nil
 		}
-		return 0, 0, 0, err
+		return 0, 0, err
 	}
 
 	cpuPercent := calculateCPUPercent(&stats)
 	memUsage := calculateMemoryUsage(&stats)
-	memLimit := int64(stats.MemoryStats.Limit)
 
-	return cpuPercent, memUsage, memLimit, nil
+	return cpuPercent, memUsage, nil
 }
 
 // containerStatsResult 保存并发抓取的结果
 type containerStatsResult struct {
 	cpuUsage    float64
 	memoryUsage int64
-	memoryLimit int64
 }
 
 func (s *DockerService) startStatsManager(ctx context.Context) {
@@ -262,19 +260,17 @@ func (s *DockerService) refreshStats(ctx context.Context) {
 		wg.Add(1)
 		go func(containerID string, dockerCli *client.Client) {
 			defer wg.Done()
-			cpu, mem, limit, err := s.fetchContainerStats(ctx, dockerCli, containerID)
+			cpu, mem, err := s.fetchContainerStats(ctx, dockerCli, containerID)
 			if err != nil {
 				// 发生错误时，记录日志并默认资源使用为 0
 				logger.Debugf("抓取容器 [%s] 监控指标失败 (可能正在停止): %v", containerID, err)
 				cpu = 0.0
 				mem = 0
-				limit = 0
 			}
 			mu.Lock()
 			results[containerID] = containerStatsResult{
 				cpuUsage:    cpu,
 				memoryUsage: mem,
-				memoryLimit: limit,
 			}
 			mu.Unlock()
 		}(id, cli)
@@ -367,12 +363,10 @@ func (s *DockerService) getEngineWorkspaces(ctx context.Context, cli *client.Cli
 		// 从缓存中读取指标数据
 		var cpuUsage float64
 		var memUsage int64
-		var memLimit int64
 		s.statsCacheMutex.RLock()
 		if stats, exists := s.statsCache[c.ID]; exists {
 			cpuUsage = stats.cpuUsage
 			memUsage = stats.memoryUsage
-			memLimit = stats.memoryLimit
 		}
 		s.statsCacheMutex.RUnlock()
 
@@ -386,7 +380,6 @@ func (s *DockerService) getEngineWorkspaces(ctx context.Context, cli *client.Cli
 			Labels:      c.Labels,
 			CpuUsage:    cpuUsage,
 			MemoryUsage: memUsage,
-			MemoryLimit: memLimit,
 		}
 
 		// 智能编排分组

@@ -25,10 +25,8 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
 
   // Dynamic performance bar colors
   const cpuColor = container.cpuUsage > 80 ? 'bg-rose-500' : container.cpuUsage > 40 ? 'bg-amber-500' : 'bg-cyan-500';
-
-  // Use memoryLimit if valid, fallback to 2GB for visualization if 0
-  const memLimit = container.memoryLimit > 0 ? container.memoryLimit : 2 * 1024 * 1024 * 1024;
-  const memPercentage = Math.min((container.memoryUsage / memLimit) * 100, 100);
+  const memMaxMock = 2 * 1024 * 1024 * 1024; // 2GB assumed limit for visualization
+  const memPercentage = Math.min((container.memoryUsage / memMaxMock) * 100, 100);
   const memColor = memPercentage > 80 ? 'bg-rose-500' : memPercentage > 40 ? 'bg-amber-500' : 'bg-purple-500';
 
   return (
@@ -100,11 +98,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
             <div>
               <div className="text-slate-400 mb-0.5 text-[10px]">MEM</div>
               <div className="text-slate-100 font-bold text-sm">
-                {isRunning ? (
-                  <span>
-                    {formatBytes(container.memoryUsage)} <span className="text-slate-500 font-normal text-xs">/ {formatBytes(memLimit)}</span>
-                  </span>
-                ) : '0 B'}
+                {isRunning ? formatBytes(container.memoryUsage) : '0 B'}
               </div>
             </div>
             {isRunning && (
