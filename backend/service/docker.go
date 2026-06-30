@@ -3,9 +3,13 @@ package service
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -46,15 +50,72 @@ func NewDockerService(ctx context.Context, engineConfigs []config.DockerEngineCo
 			opts = append(opts, client.FromEnv)
 		} else {
 			// 远程 Docker
-			opts = append(opts, client.WithHost(ec.Host))
-
+			host := ec.Host
 			// TLS 加密支持
-			if ec.TLSVerify && ec.CertPath != "" {
-				caFile := filepath.Join(ec.CertPath, "ca.pem")
-				certFile := filepath.Join(ec.CertPath, "cert.pem")
-				keyFile := filepath.Join(ec.CertPath, "key.pem")
-				opts = append(opts, client.WithTLSClientConfig(caFile, certFile, keyFile))
+			if ec.TLSVerify {
+				if ec.CACertBase64 != "" && ec.ClientCertBase64 != "" && ec.ClientKeyBase64 != "" {
+					// 使用内存中的 Base64 证书配置 TLS (现代化无状态方案)
+					caCert, err := base64.StdEncoding.DecodeString(ec.CACertBase64)
+					if err != nil {
+						logger.Warnf("实例 [%s] 的 CA 证书 Base64 解码失败: %v", ec.Name, err)
+						continue
+					}
+					clientCert, err := base64.StdEncoding.DecodeString(ec.ClientCertBase64)
+					if err != nil {
+						logger.Warnf("实例 [%s] 的 Client 证书 Base64 解码失败: %v", ec.Name, err)
+						continue
+					}
+					clientKey, err := base64.StdEncoding.DecodeString(ec.ClientKeyBase64)
+					if err != nil {
+						logger.Warnf("实例 [%s] 的 Client 私钥 Base64 解码失败: %v", ec.Name, err)
+						continue
+					}
+
+					certPool := x509.NewCertPool()
+					if !certPool.AppendCertsFromPEM(caCert) {
+						logger.Warnf("实例 [%s] 无法从 Base64 解析并追加 CA 证书", ec.Name)
+						continue
+					}
+
+					cert, err := tls.X509KeyPair(clientCert, clientKey)
+					if err != nil {
+						logger.Warnf("实例 [%s] 加载客户端证书和私钥失败: %v", ec.Name, err)
+						continue
+					}
+
+					tlsConfig := &tls.Config{
+						RootCAs:      certPool,
+						Certificates: []tls.Certificate{cert},
+					}
+
+					httpClient := &http.Client{
+						Transport: &http.Transport{
+							TLSClientConfig: tlsConfig,
+						},
+					}
+					// If we provide a custom HTTP client for TLS, we must update the host scheme to https
+					// so the underlying Docker client correctly dials TLS instead of plaintext HTTP.
+					if strings.HasPrefix(host, "tcp://") {
+						host = strings.Replace(host, "tcp://", "https://", 1)
+					} else if !strings.HasPrefix(host, "https://") && !strings.HasPrefix(host, "http://") && !strings.HasPrefix(host, "unix://") && !strings.HasPrefix(host, "npipe://") {
+						host = "https://" + host
+					}
+
+					opts = append(opts, client.WithHTTPClient(httpClient))
+					logger.Infof("实例 [%s] 成功应用内存 Base64 TLS 配置", ec.Name)
+
+				} else if ec.CertPath != "" {
+					// 回退到传统的文件路径方案
+					caFile := filepath.Join(ec.CertPath, "ca.pem")
+					certFile := filepath.Join(ec.CertPath, "cert.pem")
+					keyFile := filepath.Join(ec.CertPath, "key.pem")
+					opts = append(opts, client.WithTLSClientConfig(caFile, certFile, keyFile))
+					logger.Infof("实例 [%s] 使用本地证书文件路径配置 TLS", ec.Name)
+				} else {
+					logger.Warnf("实例 [%s] 启用了 TLSVerify，但未提供 Base64 证书或证书路径", ec.Name)
+				}
 			}
+			opts = append(opts, client.WithHost(host))
 		}
 
 		opts = append(opts, client.WithAPIVersionNegotiation())
@@ -179,7 +240,7 @@ func calculateMemoryUsage(stats *DockerStats) int64 {
 }
 
 // fetchContainerStats 异步抓取单个容器的性能指标
-func (s *DockerService) fetchContainerStats(ctx context.Context, cli *client.Client, containerID string) (float64, int64, error) {
+func (s *DockerService) fetchContainerStats(ctx context.Context, cli *client.Client, containerID string) (float64, int64, int64, error) {
 	// 设置 2 秒超时以防 Docker 守护进程无响应
 	ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
@@ -189,28 +250,30 @@ func (s *DockerService) fetchContainerStats(ctx context.Context, cli *client.Cli
 		IncludePreviousSample: true,
 	})
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	defer resp.Body.Close()
 
 	var stats DockerStats
 	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
 		if err == io.EOF {
-			return 0, 0, nil
+			return 0, 0, 0, nil
 		}
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 
 	cpuPercent := calculateCPUPercent(&stats)
 	memUsage := calculateMemoryUsage(&stats)
+	memLimit := int64(stats.MemoryStats.Limit)
 
-	return cpuPercent, memUsage, nil
+	return cpuPercent, memUsage, memLimit, nil
 }
 
 // containerStatsResult 保存并发抓取的结果
 type containerStatsResult struct {
 	cpuUsage    float64
 	memoryUsage int64
+	memoryLimit int64
 }
 
 func (s *DockerService) startStatsManager(ctx context.Context) {
@@ -260,17 +323,19 @@ func (s *DockerService) refreshStats(ctx context.Context) {
 		wg.Add(1)
 		go func(containerID string, dockerCli *client.Client) {
 			defer wg.Done()
-			cpu, mem, err := s.fetchContainerStats(ctx, dockerCli, containerID)
+			cpu, mem, limit, err := s.fetchContainerStats(ctx, dockerCli, containerID)
 			if err != nil {
 				// 发生错误时，记录日志并默认资源使用为 0
 				logger.Debugf("抓取容器 [%s] 监控指标失败 (可能正在停止): %v", containerID, err)
 				cpu = 0.0
 				mem = 0
+				limit = 0
 			}
 			mu.Lock()
 			results[containerID] = containerStatsResult{
 				cpuUsage:    cpu,
 				memoryUsage: mem,
+				memoryLimit: limit,
 			}
 			mu.Unlock()
 		}(id, cli)
@@ -363,10 +428,12 @@ func (s *DockerService) getEngineWorkspaces(ctx context.Context, cli *client.Cli
 		// 从缓存中读取指标数据
 		var cpuUsage float64
 		var memUsage int64
+		var memLimit int64
 		s.statsCacheMutex.RLock()
 		if stats, exists := s.statsCache[c.ID]; exists {
 			cpuUsage = stats.cpuUsage
 			memUsage = stats.memoryUsage
+			memLimit = stats.memoryLimit
 		}
 		s.statsCacheMutex.RUnlock()
 
@@ -380,6 +447,7 @@ func (s *DockerService) getEngineWorkspaces(ctx context.Context, cli *client.Cli
 			Labels:      c.Labels,
 			CpuUsage:    cpuUsage,
 			MemoryUsage: memUsage,
+			MemoryLimit: memLimit,
 		}
 
 		// 智能编排分组
@@ -530,3 +598,210 @@ func (s *DockerService) ContainerExec(ctx context.Context, id string, cmd []stri
 	return "", "", 0, fmt.Errorf("未找到容器: %s", id)
 }
 
+
+// LogMessage represents a structured log message sent over WebSocket
+type LogMessage struct {
+	Type string `json:"type"`
+	Data string `json:"data"`
+}
+
+// ContainerLogsStream 实时获取并流式返回容器日志内容
+func (s *DockerService) ContainerLogsStream(ctx context.Context, id string, tail string, conn interface { WriteMessage(messageType int, data []byte) error }) error {
+	for _, clientInfo := range s.clients {
+		inspect, err := clientInfo.Cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
+		if err == nil {
+			reader, err := clientInfo.Cli.ContainerLogs(ctx, id, client.ContainerLogsOptions{
+				ShowStdout: true,
+				ShowStderr: true,
+				Tail:       tail,
+				Follow:     true,
+				Timestamps: false,
+			})
+			if err != nil {
+				return err
+			}
+			defer reader.Close()
+
+			// Start a goroutine to wait for context cancellation and close reader
+			go func() {
+				<-ctx.Done()
+				reader.Close()
+			}()
+
+			// We need websocket package but it's not imported in service.
+			// Let's pass an interface that has WriteMessage(int, []byte) error to avoid cyclical dependencies or importing websocket here if unnecessary.
+			// 1 == websocket.TextMessage
+
+			if inspect.Container.Config.Tty {
+				buf := make([]byte, 4096)
+				for {
+					n, err := reader.Read(buf)
+					if n > 0 {
+						msg := LogMessage{
+							Type: "stdout",
+							Data: string(buf[:n]),
+						}
+						jsonMsg, _ := json.Marshal(msg)
+						if writeErr := conn.WriteMessage(1, jsonMsg); writeErr != nil {
+							return writeErr
+						}
+					}
+					if err != nil {
+						if err == io.EOF {
+							return nil
+						}
+						return err
+					}
+				}
+			} else {
+				// Use docker's stdcopy to demultiplex stdout and stderr
+				// StdCopy writes to io.Writer. We can create a custom writer that wraps the conn.WriteMessage.
+
+				stdoutWriter := &WSWriter{conn: conn, streamType: "stdout"}
+				stderrWriter := &WSWriter{conn: conn, streamType: "stderr"}
+
+				_, err = stdcopy.StdCopy(stdoutWriter, stderrWriter, reader)
+				if err != nil && err != io.EOF {
+					return err
+				}
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("未找到容器: %s", id)
+}
+
+// ContainerExecWS 开启容器 WebTerminal
+func (s *DockerService) ContainerExecWS(ctx context.Context, id string, conn interface {
+	WriteMessage(messageType int, data []byte) error
+	ReadMessage() (messageType int, p []byte, err error)
+}) error {
+	for _, clientInfo := range s.clients {
+		_, err := clientInfo.Cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
+		if err == nil {
+			// 先试 bash，不行再用 sh
+			execConfig := client.ExecCreateOptions{
+				Cmd:          []string{"sh", "-c", "exec bash || exec sh"},
+				AttachStdin:  true,
+				AttachStdout: true,
+				AttachStderr: true,
+				TTY:          true,
+			}
+			execID, err := clientInfo.Cli.ExecCreate(ctx, id, execConfig)
+			if err != nil {
+				return err
+			}
+
+			resp, err := clientInfo.Cli.ExecAttach(ctx, execID.ID, client.ExecAttachOptions{
+				TTY: true,
+			})
+			if err != nil {
+				return err
+			}
+			defer resp.Close()
+
+			errChan := make(chan error, 2)
+
+			// 处理输出: 从容器复制到 WebSocket
+			go func() {
+				buf := make([]byte, 8192)
+				for {
+					n, err := resp.Reader.Read(buf)
+					if n > 0 {
+						if writeErr := conn.WriteMessage(2, buf[:n]); writeErr != nil { // 2 = websocket.BinaryMessage
+							errChan <- writeErr
+							return
+						}
+					}
+					if err != nil {
+						errChan <- err
+						return
+					}
+				}
+			}()
+
+			// 处理输入: 从 WebSocket 读取并写入容器
+			go func() {
+				for {
+					messageType, p, err := conn.ReadMessage()
+					if err != nil {
+						errChan <- err
+						return
+					}
+
+					// 仅处理文本和二进制消息
+					if messageType == 1 || messageType == 2 {
+						// 简单 JSON 解析检查是否是 resize 命令，或者是纯输入数据
+						var payload struct {
+							Type string `json:"type"`
+							Data string `json:"data"`
+							Cols int    `json:"cols"`
+							Rows int    `json:"rows"`
+						}
+
+						if jsonErr := json.Unmarshal(p, &payload); jsonErr == nil && payload.Type != "" {
+							if payload.Type == "resize" {
+								// 处理窗口大小调整
+								_, _ = clientInfo.Cli.ExecResize(ctx, execID.ID, client.ExecResizeOptions{
+									Height: uint(payload.Rows),
+									Width:  uint(payload.Cols),
+								})
+								continue
+							} else if payload.Type == "input" {
+								_, writeErr := resp.Conn.Write([]byte(payload.Data))
+								if writeErr != nil {
+									errChan <- writeErr
+									return
+								}
+								continue
+							}
+						}
+
+						// 如果不是 JSON，作为普通二进制输入发送
+						_, writeErr := resp.Conn.Write(p)
+						if writeErr != nil {
+							errChan <- writeErr
+							return
+						}
+					}
+				}
+			}()
+
+			// 等待任一方向发生错误（或者关闭）
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case err := <-errChan:
+				if err == io.EOF {
+					return nil
+				}
+				return err
+			}
+		}
+	}
+	return fmt.Errorf("未找到容器: %s", id)
+}
+
+// WSWriter wraps a websocket connection to implement io.Writer
+type WSWriter struct {
+	conn       interface { WriteMessage(messageType int, data []byte) error }
+	streamType string
+}
+
+// Write implements io.Writer for WSWriter
+func (w *WSWriter) Write(p []byte) (n int, err error) {
+	msg := LogMessage{
+		Type: w.streamType,
+		Data: string(p),
+	}
+	jsonMsg, err := json.Marshal(msg)
+	if err != nil {
+		return 0, err
+	}
+
+	err = w.conn.WriteMessage(1, jsonMsg)
+	if err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}

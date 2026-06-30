@@ -3,7 +3,10 @@ import type { ProjectWorkspace } from './types';
 import { formatBytes } from './utils/format';
 import { WorkspaceCard } from './components/WorkspaceCard';
 import { LogsModal } from './components/LogsModal';
+import { TerminalModal } from './components/TerminalModal';
 import { useTranslation } from 'react-i18next';
+import { GlassPanel, ProgressBar } from './components/ui';
+import { cn } from './utils/cn';
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -17,6 +20,7 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [selectedLogContainer, setSelectedLogContainer] = useState<{ id: string, name: string } | null>(null);
+  const [selectedTerminalContainer, setSelectedTerminalContainer] = useState<{ id: string, name: string } | null>(null);
 
   // 轮询数据
   const fetchData = () => {
@@ -321,12 +325,7 @@ export default function App() {
             </div>
             {stats.totalContainers > 0 && (
               <div className="mt-3">
-                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-cyan-500 h-full rounded-full transition-all duration-500" 
-                    style={{ width: `${Math.min(stats.totalCPU, 100)}%` }}
-                  ></div>
-                </div>
+                <ProgressBar value={stats.totalCPU} max={100} showBackground={false} />
               </div>
             )}
           </div>
@@ -345,12 +344,7 @@ export default function App() {
             </div>
             {stats.totalContainers > 0 && (
               <div className="mt-3">
-                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-purple-500 h-full rounded-full transition-all duration-500" 
-                    style={{ width: `${Math.min((stats.totalMemory / (4 * 1024 * 1024 * 1024)) * 100, 100)}%` }} // 假定4G为满载
-                  ></div>
-                </div>
+                <ProgressBar value={stats.totalMemory} max={4 * 1024 * 1024 * 1024} showBackground={false} className="[&>div]:bg-purple-500" />
               </div>
             )}
           </div>
@@ -391,19 +385,19 @@ export default function App() {
             <div className="flex items-center bg-slate-950 border border-slate-800 p-0.5 rounded-lg">
               <button 
                 onClick={() => setStatusFilter("all")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${statusFilter === "all" ? "bg-slate-800 text-slate-100 shadow-sm" : "text-slate-400 hover:text-slate-200"}`}
+                className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", statusFilter === "all" ? "bg-slate-800 text-slate-100 shadow-sm" : "text-slate-400 hover:text-slate-200")}
               >
                 {t('filter.statusAll')}
               </button>
               <button 
                 onClick={() => setStatusFilter("running")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${statusFilter === "running" ? "bg-emerald-950/50 text-emerald-400 shadow-sm" : "text-slate-400 hover:text-slate-200"}`}
+                className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", statusFilter === "running" ? "bg-emerald-950/50 text-emerald-400 shadow-sm" : "text-slate-400 hover:text-slate-200")}
               >
                 {t('filter.statusRunning')}
               </button>
               <button 
                 onClick={() => setStatusFilter("stopped")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${statusFilter === "stopped" ? "bg-rose-950/50 text-rose-400 shadow-sm" : "text-slate-400 hover:text-slate-200"}`}
+                className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", statusFilter === "stopped" ? "bg-rose-950/50 text-rose-400 shadow-sm" : "text-slate-400 hover:text-slate-200")}
               >
                 {t('filter.statusStopped')}
               </button>
@@ -413,19 +407,19 @@ export default function App() {
             <div className="flex items-center bg-slate-950 border border-slate-800 p-0.5 rounded-lg">
               <button 
                 onClick={() => setTypeFilter("all")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${typeFilter === "all" ? "bg-slate-800 text-slate-100 shadow-sm" : "text-slate-400 hover:text-slate-200"}`}
+                className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", typeFilter === "all" ? "bg-slate-800 text-slate-100 shadow-sm" : "text-slate-400 hover:text-slate-200")}
               >
                 {t('filter.typeAll')}
               </button>
               <button 
                 onClick={() => setTypeFilter("compose")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${typeFilter === "compose" ? "bg-indigo-950/50 text-indigo-400 shadow-sm" : "text-slate-400 hover:text-slate-200"}`}
+                className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", typeFilter === "compose" ? "bg-indigo-950/50 text-indigo-400 shadow-sm" : "text-slate-400 hover:text-slate-200")}
               >
                 {t('filter.typeCompose')}
               </button>
               <button 
                 onClick={() => setTypeFilter("standalone")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${typeFilter === "standalone" ? "bg-slate-800 text-slate-200 shadow-sm" : "text-slate-400 hover:text-slate-200"}`}
+                className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", typeFilter === "standalone" ? "bg-slate-800 text-slate-200 shadow-sm" : "text-slate-400 hover:text-slate-200")}
               >
                 {t('filter.typeStandalone')}
               </button>
@@ -451,13 +445,13 @@ export default function App() {
 
         {/* 项目/工作区看板列表 */}
         {processedWorkspaces.length === 0 ? (
-          <div className="glass-panel rounded-2xl p-16 text-center text-slate-500">
+          <GlassPanel className="p-16 text-center text-slate-500 rounded-2xl">
             <svg width="48" height="48" className="mx-auto h-12 w-12 text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p className="text-base font-medium text-slate-400">{t('noMatch')}</p>
             <p className="text-xs text-slate-600 mt-1">{t('noMatchSub')}</p>
-          </div>
+          </GlassPanel>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
             {processedWorkspaces.map((workspace) => (
@@ -472,6 +466,7 @@ export default function App() {
                 onContainerStop={(id, name) => handleContainerAction(id, "stop", "stop", name)}
                 onContainerRestart={(id, name) => handleContainerAction(id, "restart", "restart", name)}
                 onContainerLogs={(id, name) => setSelectedLogContainer({ id, name })}
+                    onContainerTerminal={(id, name) => setSelectedTerminalContainer({ id, name })}
               />
             ))}
           </div>
@@ -484,6 +479,14 @@ export default function App() {
           containerId={selectedLogContainer.id}
           containerName={selectedLogContainer.name}
           onClose={() => setSelectedLogContainer(null)}
+        />
+      )}
+
+      {selectedTerminalContainer && (
+        <TerminalModal
+          containerId={selectedTerminalContainer.id}
+          containerName={selectedTerminalContainer.name}
+          onClose={() => setSelectedTerminalContainer(null)}
         />
       )}
     </div>

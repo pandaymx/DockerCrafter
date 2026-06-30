@@ -32,11 +32,15 @@ jobs:
         run: go mod download
 
       - name: Build
-        run: go build -v -o bin/server ./cmd/server
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -v -o bin/backend-linux-amd64 ./cmd/server
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -v -o bin/backend-linux-arm64 ./cmd/server
 
-      # Optional: Add test step if tests exist
-      # - name: Test
-      #   run: go test -v ./...
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-binaries
+          path: backend/bin/
 
   frontend:
     name: Build Frontend
@@ -63,6 +67,12 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
   docker-backend:
     name: Build & Push Backend Docker Image
     runs-on: ubuntu-latest
@@ -73,6 +83,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download backend binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-binaries
+          path: backend/bin/
 
       - name: Lowercase repository name
         run: |
@@ -105,6 +121,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./backend
+          file: ./backend/Dockerfile.ci
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -122,6 +139,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
 
       - name: Lowercase repository name
         run: |
@@ -154,6 +177,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
+          file: ./frontend/Dockerfile.ci
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

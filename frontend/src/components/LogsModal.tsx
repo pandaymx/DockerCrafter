@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button } from './ui';
 
 interface LogsModalProps {
   containerId: string;
@@ -7,9 +8,14 @@ interface LogsModalProps {
   onClose: () => void;
 }
 
+interface LogFragment {
+  type: string;
+  data: string;
+}
+
 export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName, onClose }) => {
   const { t } = useTranslation();
-  const [logs, setLogs] = useState<string>('');
+  const [logs, setLogs] = useState<LogFragment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [autoScroll, setAutoScroll] = useState<boolean>(true);
@@ -17,30 +23,92 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
   const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const response = await fetch(`/api/containers/logs?id=${containerId}&tail=100`);
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status} ${response.statusText}`);
-        }
-        const data = await response.json();
-        setLogs(data.logs || '');
+    let ws: WebSocket;
+    let reconnectTimeout: number;
+    let retryCount = 0;
+    let isMounted = true;
+    const maxRetries = 5;
+
+    const connectWS = () => {
+      if (ws) ws.close();
+      setLoading(true);
+      setLogs([]); // Clear logs before reconnecting to prevent duplicating trailing logs
+
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/containers/logs/ws?id=${containerId}&tail=100`;
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
         setError(null);
-      } catch (err: any) {
-        console.error(err);
-        setError(err.message || t('logsModal.fetchError'));
-      } finally {
         setLoading(false);
-      }
+        retryCount = 0; // Reset retries on successful connection
+      };
+
+      ws.onmessage = (event) => {
+        let newFragment: LogFragment;
+        try {
+          const parsed = JSON.parse(event.data);
+          newFragment = {
+            type: parsed.type || 'stdout',
+            data: parsed.data || '',
+          };
+        } catch {
+          // Fallback for non-JSON strings (e.g. legacy backend or errors)
+          newFragment = {
+            type: 'stdout',
+            data: event.data,
+          };
+        }
+
+        setLogs((prev) => {
+          if (prev.length === 0) return [newFragment];
+          const last = prev[prev.length - 1];
+          if (last.type === newFragment.type) {
+            // Merge chunks to reduce DOM size and rendering load
+            return [
+              ...prev.slice(0, prev.length - 1),
+              { type: last.type, data: last.data + newFragment.data },
+            ];
+          }
+          return [...prev, newFragment];
+        });
+      };
+
+      ws.onerror = () => {
+        setError(t('logsModal.fetchError') || 'WebSocket connection error');
+        setLoading(false);
+      };
+
+      ws.onclose = (event) => {
+        if (!isMounted || event.wasClean) return;
+
+        // Exponential backoff reconnect
+        if (retryCount < maxRetries) {
+          const timeout = Math.min(1000 * Math.pow(2, retryCount), 10000);
+          console.log(`WebSocket closed, retrying in ${timeout}ms...`);
+          reconnectTimeout = window.setTimeout(() => {
+            retryCount++;
+            connectWS();
+          }, timeout);
+        } else {
+          setError('Connection lost. Max retries reached.');
+          setLoading(false);
+        }
+      };
     };
 
-    // Initial fetch
-    fetchLogs();
+    connectWS();
 
-    // Set up polling every 3 seconds
-    const intervalId = setInterval(fetchLogs, 3000);
-
-    return () => clearInterval(intervalId);
+    return () => {
+      isMounted = false;
+      if (ws) {
+        ws.close();
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+    };
   }, [containerId, t]);
 
   useEffect(() => {
@@ -78,15 +146,17 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
               />
               {t('logsModal.autoScroll')}
             </label>
-            <button
+            <Button
+              variant="icon"
+              size="icon"
               onClick={onClose}
-              className="text-zinc-400 hover:text-rose-400 transition-colors p-1"
               title={t('logsModal.close')}
+              className="text-zinc-400 hover:text-rose-400 hover:bg-transparent"
             >
               <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />
               </svg>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -94,9 +164,13 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
         <div className="relative flex-1 overflow-y-auto p-4 bg-zinc-950 max-h-[60vh] min-h-[40vh]">
           {error ? (
             <div className="text-rose-500 font-mono text-sm">{error}</div>
-          ) : logs ? (
-            <pre className="font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap break-all">
-              {logs}
+          ) : logs.length > 0 ? (
+            <pre className="font-mono text-xs leading-relaxed whitespace-pre-wrap break-all">
+              {logs.map((frag, idx) => (
+                <span key={idx} className={frag.type === 'stderr' ? 'text-rose-400' : 'text-zinc-300'}>
+                  {frag.data}
+                </span>
+              ))}
               <div ref={logEndRef} />
             </pre>
           ) : (
