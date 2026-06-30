@@ -262,7 +262,10 @@ export default function App() {
               </button>
             </div>
             <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+              <div className="relative flex h-2.5 w-2.5 shrink-0 items-center justify-center">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-40 animate-pulse" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+              </div>
               <span className="text-slate-300">{t('backendStatus')}</span>
             </div>
           </div>
