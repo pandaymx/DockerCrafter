@@ -90,7 +90,6 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
             >
               <Terminal className="w-4 h-4" />
             </Button>
-            </button>
             <button
               onClick={() => onTerminal?.(container.id, container.name)}
               title={t('container.terminal', { defaultValue: 'Terminal' })}
