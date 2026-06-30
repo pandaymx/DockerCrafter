@@ -103,12 +103,19 @@ func LoadConfig() *Config {
 	}
 
 	// 6. 设置默认 CORS 配置
-	// 修改：默认开启无 CORS 头限制（空），以适配生产环境中 Nginx 反向代理
-	if corsCfg.AllowMethods == "" {
-		corsCfg.AllowMethods = "GET, OPTIONS"
-	}
-	if corsCfg.AllowHeaders == "" {
-		corsCfg.AllowHeaders = "Content-Type"
+	// 修改：只有当用户明确配置了允许跨域的 Origin 时，才去设置其他 CORS 头的默认值
+	// 如果未配置（即空），则严格保持为空，不进行任何动态反射或通配符降级，以适配生产环境中 Nginx 反向代理
+	if corsCfg.AllowOrigin != "" {
+		if corsCfg.AllowMethods == "" {
+			corsCfg.AllowMethods = "GET, OPTIONS"
+		}
+		if corsCfg.AllowHeaders == "" {
+			corsCfg.AllowHeaders = "Content-Type"
+		}
+	} else {
+		// 安全兜底：确保没有意外赋予默认值
+		corsCfg.AllowMethods = ""
+		corsCfg.AllowHeaders = ""
 	}
 
 	// 7. 初始化全局日志级别
