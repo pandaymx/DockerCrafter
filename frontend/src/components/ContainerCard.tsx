@@ -34,13 +34,12 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
       <div>
         {/* Header: Name, State light, Action buttons */}
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <StatusBadge status={container.state as any} showDot className="px-0 py-0 border-none bg-transparent">
-              <h4 className="font-mono font-bold text-slate-200 text-sm truncate max-w-[150px] sm:max-w-[180px] ml-1" title={container.name}>
+          <div className="flex items-center min-w-0 mr-2">
+            <StatusBadge status={container.state as any} showDot className="px-0 py-0 border-none bg-transparent min-w-0">
+              <h4 className="font-mono font-bold text-slate-200 text-sm truncate ml-1" title={container.name}>
                 {container.name}
               </h4>
             </StatusBadge>
-            <span className="text-[11px] text-slate-400 font-mono shrink-0">({container.state})</span>
           </div>
 
           {/* Action buttons */}
