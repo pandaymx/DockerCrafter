@@ -17,30 +17,66 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
   const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const response = await fetch(`/api/containers/logs?id=${containerId}&tail=100`);
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status} ${response.statusText}`);
-        }
-        const data = await response.json();
-        setLogs(data.logs || '');
+    let ws: WebSocket;
+    let reconnectTimeout: number;
+    let retryCount = 0;
+    let isMounted = true;
+    const maxRetries = 5;
+
+    const connectWS = () => {
+      if (ws) ws.close();
+      setLoading(true);
+      setLogs(''); // Clear logs before reconnecting to prevent duplicating trailing logs
+
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/containers/logs/ws?id=${containerId}&tail=100`;
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
         setError(null);
-      } catch (err: any) {
-        console.error(err);
-        setError(err.message || t('logsModal.fetchError'));
-      } finally {
         setLoading(false);
-      }
+        retryCount = 0; // Reset retries on successful connection
+      };
+
+      ws.onmessage = (event) => {
+        setLogs((prev) => prev + event.data);
+      };
+
+      ws.onerror = () => {
+        setError(t('logsModal.fetchError') || 'WebSocket connection error');
+        setLoading(false);
+      };
+
+      ws.onclose = (event) => {
+        if (!isMounted || event.wasClean) return;
+
+        // Exponential backoff reconnect
+        if (retryCount < maxRetries) {
+          const timeout = Math.min(1000 * Math.pow(2, retryCount), 10000);
+          console.log(`WebSocket closed, retrying in ${timeout}ms...`);
+          reconnectTimeout = window.setTimeout(() => {
+            retryCount++;
+            connectWS();
+          }, timeout);
+        } else {
+          setError('Connection lost. Max retries reached.');
+          setLoading(false);
+        }
+      };
     };
 
-    // Initial fetch
-    fetchLogs();
+    connectWS();
 
-    // Set up polling every 3 seconds
-    const intervalId = setInterval(fetchLogs, 3000);
-
-    return () => clearInterval(intervalId);
+    return () => {
+      isMounted = false;
+      if (ws) {
+        ws.close();
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+    };
   }, [containerId, t]);
 
   useEffect(() => {
