@@ -72,6 +72,17 @@ docker-dev-panel/
 - 🍞 **Node.js / Bun**: Bun v1.3+ is recommended
 - 🐳 **Docker**: Local Docker daemon running (accessible via socket)
 
+### 🌐 环境变量配置 (Environment Variables)
+
+当使用 Docker 镜像进行部署时，可以通过注入以下环境变量来覆盖默认行为，无需挂载配置文件：
+
+| 环境变量 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `PORT` | `12581` | 后端服务监听端口 |
+| `LOG_LEVEL` | `INFO` | 日志级别 (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
+| `CORS_ALLOW_ORIGIN`| `""` (禁用跨域) | 允许跨域的 Origin。若通过 Nginx 同源代理部署，请保持默认为空 |
+| `DB_PATH` | `./data/dockercrafter.db` | 本地 SQLite 数据库文件的存储路径 |
+
 ### 1. 🚀 运行后端 / Start the Backend (Go)
 
 Navigate to the `backend` directory, install packages, and start the API server:
