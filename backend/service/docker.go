@@ -671,6 +671,117 @@ func (s *DockerService) ContainerLogsStream(ctx context.Context, id string, tail
 	return fmt.Errorf("未找到容器: %s", id)
 }
 
+// ContainerExecWS 开启容器 WebTerminal
+func (s *DockerService) ContainerExecWS(ctx context.Context, id string, conn interface {
+	WriteMessage(messageType int, data []byte) error
+	ReadMessage() (messageType int, p []byte, err error)
+}) error {
+	for _, clientInfo := range s.clients {
+		_, err := clientInfo.Cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
+		if err == nil {
+			// 先试 bash，不行再用 sh
+			execConfig := client.ExecCreateOptions{
+				Cmd:          []string{"sh", "-c", "exec bash || exec sh"},
+				AttachStdin:  true,
+				AttachStdout: true,
+				AttachStderr: true,
+				TTY:          true,
+			}
+			execID, err := clientInfo.Cli.ExecCreate(ctx, id, execConfig)
+			if err != nil {
+				return err
+			}
+
+			resp, err := clientInfo.Cli.ExecAttach(ctx, execID.ID, client.ExecAttachOptions{
+				TTY: true,
+			})
+			if err != nil {
+				return err
+			}
+			defer resp.Close()
+
+			errChan := make(chan error, 2)
+
+			// 处理输出: 从容器复制到 WebSocket
+			go func() {
+				buf := make([]byte, 8192)
+				for {
+					n, err := resp.Reader.Read(buf)
+					if n > 0 {
+						if writeErr := conn.WriteMessage(2, buf[:n]); writeErr != nil { // 2 = websocket.BinaryMessage
+							errChan <- writeErr
+							return
+						}
+					}
+					if err != nil {
+						errChan <- err
+						return
+					}
+				}
+			}()
+
+			// 处理输入: 从 WebSocket 读取并写入容器
+			go func() {
+				for {
+					messageType, p, err := conn.ReadMessage()
+					if err != nil {
+						errChan <- err
+						return
+					}
+
+					// 仅处理文本和二进制消息
+					if messageType == 1 || messageType == 2 {
+						// 简单 JSON 解析检查是否是 resize 命令，或者是纯输入数据
+						var payload struct {
+							Type string `json:"type"`
+							Data string `json:"data"`
+							Cols int    `json:"cols"`
+							Rows int    `json:"rows"`
+						}
+
+						if jsonErr := json.Unmarshal(p, &payload); jsonErr == nil && payload.Type != "" {
+							if payload.Type == "resize" {
+								// 处理窗口大小调整
+								_, _ = clientInfo.Cli.ExecResize(ctx, execID.ID, client.ExecResizeOptions{
+									Height: uint(payload.Rows),
+									Width:  uint(payload.Cols),
+								})
+								continue
+							} else if payload.Type == "input" {
+								_, writeErr := resp.Conn.Write([]byte(payload.Data))
+								if writeErr != nil {
+									errChan <- writeErr
+									return
+								}
+								continue
+							}
+						}
+
+						// 如果不是 JSON，作为普通二进制输入发送
+						_, writeErr := resp.Conn.Write(p)
+						if writeErr != nil {
+							errChan <- writeErr
+							return
+						}
+					}
+				}
+			}()
+
+			// 等待任一方向发生错误（或者关闭）
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case err := <-errChan:
+				if err == io.EOF {
+					return nil
+				}
+				return err
+			}
+		}
+	}
+	return fmt.Errorf("未找到容器: %s", id)
+}
+
 // WSWriter wraps a websocket connection to implement io.Writer
 type WSWriter struct {
 	conn       interface { WriteMessage(messageType int, data []byte) error }
