@@ -21,7 +21,6 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 
 COPY --from=builder /app/dockercrafter-backend .
-COPY --from=builder /app/config.yaml .
 
 # Port exposed by the application
 EXPOSE 12581
