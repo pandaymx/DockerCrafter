@@ -20,7 +20,7 @@ export default function App() {
 
   // 轮询数据
   const fetchData = () => {
-    fetch("http://localhost:12581/api/projects")
+    fetch("/api/projects")
       .then((res) => res.json())
       .then((data) => {
         setWorkspaces(data || []);
@@ -52,6 +52,60 @@ export default function App() {
       ...prev,
       [name]: !prev[name]
     }));
+  };
+
+  // 处理单个容器操作
+  const handleContainerAction = async (id: string, action: "start" | "stop" | "restart", actionName: string, name: string) => {
+    showToast(t(`toast.${actionName}ing`, `${actionName}ing ${name}...`));
+    try {
+      const res = await fetch("http://localhost:12581/api/containers/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action })
+      });
+      if (res.ok) {
+        showToast(t(`toast.${actionName}Success`, `Successfully ${actionName}ed ${name}!`));
+        fetchData();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(t(`toast.${actionName}Error`, `Failed to ${actionName} ${name}: ${errData.error || res.statusText}`));
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(t(`toast.${actionName}Error`, `Failed to ${actionName} ${name}`));
+    }
+  };
+
+  // 处理工作区批量操作
+  const handleBatchAction = async (projectName: string, action: "start" | "stop", actionName: string) => {
+    const workspace = workspaces.find(ws => ws.projectName === projectName);
+    if (!workspace) return;
+
+    showToast(t(`toast.${actionName}ing`, `${actionName}ing workspace ${projectName}...`));
+
+    try {
+      const promises = workspace.containers.map(c =>
+        fetch("http://localhost:12581/api/containers/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: c.id, action })
+        })
+      );
+
+      const results = await Promise.all(promises);
+      const allOk = results.every(r => r.ok);
+
+      if (allOk) {
+        showToast(t(`toast.${actionName}Success`, `Successfully ${actionName}ed workspace ${projectName}!`));
+        fetchData();
+      } else {
+        showToast(t(`toast.${actionName}Error`, `Some containers failed to ${actionName} in ${projectName}`));
+        fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(t(`toast.${actionName}Error`, `Failed to ${actionName} workspace ${projectName}`));
+    }
   };
 
   // 全局数据统计计算
@@ -412,12 +466,12 @@ export default function App() {
                 workspace={workspace}
                 isCollapsed={!!collapsedWorkspaces[workspace.projectName]}
                 onToggleCollapse={() => toggleCollapse(workspace.projectName)}
-                onBatchStart={(name) => showToast(t('toast.batchStart', { name }))}
-                onBatchStop={(name) => showToast(t('toast.batchStop', { name }))}
-                onContainerStart={(name) => showToast(t('toast.containerStart', { name }))}
-                onContainerStop={(name) => showToast(t('toast.containerStop', { name }))}
-                onContainerRestart={(name) => showToast(t('toast.containerRestart', { name }))}
-                onContainerLogs={(id, name) => setSelectedLogContainer({ id, name })}
+                onBatchStart={(name) => handleBatchAction(name, "start", "start")}
+                onBatchStop={(name) => handleBatchAction(name, "stop", "stop")}
+                onContainerStart={(id, name) => handleContainerAction(id, "start", "start", name)}
+                onContainerStop={(id, name) => handleContainerAction(id, "stop", "stop", name)}
+                onContainerRestart={(id, name) => handleContainerAction(id, "restart", "restart", name)}
+                onContainerLogs={(_id, _name) => showToast(t('toast.backendUpgradeTip'))}
               />
             ))}
           </div>

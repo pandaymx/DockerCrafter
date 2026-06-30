@@ -6,9 +6,9 @@ import { formatBytes } from '../utils/format';
 
 interface ContainerCardProps {
   container: ContainerInfo;
-  onStart?: (name: string) => void;
-  onStop?: (name: string) => void;
-  onRestart?: (name: string) => void;
+  onStart?: (id: string, name: string) => void;
+  onStop?: (id: string, name: string) => void;
+  onRestart?: (id: string, name: string) => void;
   onLogs?: (id: string, name: string) => void;
 }
 
@@ -45,7 +45,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
           <div className="flex items-center gap-1.5 text-slate-400 shrink-0">
             {isRunning ? (
               <button
-                onClick={() => onStop?.(container.name)}
+                onClick={() => onStop?.(container.id, container.name)}
                 title={t('container.stop')}
                 className="p-1 hover:text-rose-400 hover:bg-slate-700 rounded transition text-xs"
               >
@@ -53,7 +53,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
               </button>
             ) : (
               <button
-                onClick={() => onStart?.(container.name)}
+                onClick={() => onStart?.(container.id, container.name)}
                 title={t('container.start')}
                 className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition text-xs"
               >
@@ -61,7 +61,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
               </button>
             )}
             <button
-              onClick={() => onRestart?.(container.name)}
+              onClick={() => onRestart?.(container.id, container.name)}
               title={t('container.restart')}
               className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition text-xs"
             >
