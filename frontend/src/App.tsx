@@ -7,12 +7,14 @@ import { TerminalModal } from './components/TerminalModal';
 import { useTranslation } from 'react-i18next';
 import { GlassPanel, ProgressBar } from './components/ui';
 import { cn } from './utils/cn';
+import { useDebounce } from './hooks/useDebounce';
 
 export default function App() {
   const { t, i18n } = useTranslation();
   const [workspaces, setWorkspaces] = useState<ProjectWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [statusFilter, setStatusFilter] = useState<"all" | "running" | "stopped">("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "compose" | "standalone">("all");
   const [sortBy, setSortBy] = useState<"name" | "containers" | "cpu" | "memory">("name");
@@ -151,9 +153,9 @@ export default function App() {
       // 过滤容器
       const filteredContainers = ws.containers.filter(c => {
         const matchesSearch = 
-          c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          c.image.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          ws.projectName.toLowerCase().includes(searchQuery.toLowerCase());
+          c.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+          c.image.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+          ws.projectName.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
         
         const isRunning = c.state === "running";
         const matchesStatus = 
@@ -193,7 +195,7 @@ export default function App() {
       }
       return 0;
     });
-  }, [workspaces, searchQuery, statusFilter, typeFilter, sortBy]);
+  }, [workspaces, debouncedSearchQuery, statusFilter, typeFilter, sortBy]);
 
   if (loading && workspaces.length === 0) {
     return (
