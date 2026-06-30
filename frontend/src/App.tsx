@@ -58,7 +58,7 @@ export default function App() {
   const handleContainerAction = async (id: string, action: "start" | "stop" | "restart", actionName: string, name: string) => {
     showToast(t(`toast.${actionName}ing`, `${actionName}ing ${name}...`));
     try {
-      const res = await fetch("http://localhost:12581/api/containers/action", {
+      const res = await fetch("/api/containers/action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, action })
@@ -85,7 +85,7 @@ export default function App() {
 
     try {
       const promises = workspace.containers.map(c =>
-        fetch("http://localhost:12581/api/containers/action", {
+        fetch("/api/containers/action", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: c.id, action })
