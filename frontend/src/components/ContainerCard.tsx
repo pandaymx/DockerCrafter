@@ -26,14 +26,8 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
   const { t } = useTranslation();
   const isRunning = container.state === 'running';
 
-  // Dynamic performance bar colors
-  const memMaxMock = 2 * 1024 * 1024 * 1024; // 2GB assumed limit for visualization
-  const cpuColor = container.cpuUsage > 80 ? 'bg-rose-500' : container.cpuUsage > 40 ? 'bg-amber-500' : 'bg-cyan-500';
-
   // Use memoryLimit if valid, fallback to 2GB for visualization if 0
   const memLimit = container.memoryLimit > 0 ? container.memoryLimit : 2 * 1024 * 1024 * 1024;
-  const memPercentage = Math.min((container.memoryUsage / memLimit) * 100, 100);
-  const memColor = memPercentage > 80 ? 'bg-rose-500' : memPercentage > 40 ? 'bg-amber-500' : 'bg-purple-500';
 
   return (
     <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 hover:border-blue-500/50 transition-all duration-200 shadow-lg backdrop-blur-sm flex flex-col justify-between">
@@ -126,7 +120,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
               </div>
             </div>
             {isRunning && (
-              <ProgressBar value={container.memoryUsage} max={memMaxMock} colorType="memory" className="mt-1.5 h-1" />
+              <ProgressBar value={container.memoryUsage} max={memLimit} colorType="memory" className="mt-1.5 h-1" />
             )}
           </div>
         </div>
