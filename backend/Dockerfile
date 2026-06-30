@@ -8,7 +8,7 @@ RUN go mod download
 COPY . .
 
 # Build the Go app
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o dockercrafter-backend ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -v -o dockercrafter-backend ./cmd/server
 
 # Final stage
 FROM alpine:latest
