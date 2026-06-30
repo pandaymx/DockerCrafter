@@ -3,16 +3,16 @@ FROM oven/bun:latest AS builder
 WORKDIR /app
 
 COPY package.json bun.lock ./
-RUN bun install
+RUN bun install --frozen-lockfile
 
 COPY . .
 
 RUN bun run build
 
-FROM nginx:alpine
+FROM nginx:alpine-slim
 
-# Remove default nginx static assets
-RUN rm -rf /usr/share/nginx/html/*
+# Remove default nginx static assets and default configurations
+RUN rm -rf /usr/share/nginx/html/* && rm -rf /etc/nginx/conf.d/*
 
 # Copy build artifacts
 COPY --from=builder /app/dist /usr/share/nginx/html

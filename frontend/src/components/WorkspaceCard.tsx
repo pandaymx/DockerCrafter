@@ -1,6 +1,7 @@
 // src/components/WorkspaceCard.tsx
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { FolderGit, Package, Settings, Play, Square, MapPin } from 'lucide-react';
 import type { ProjectWorkspace } from '../types';
 import { ContainerCard } from './ContainerCard';
 
@@ -39,8 +40,8 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
             className="flex items-center gap-2.5 min-w-0 cursor-pointer select-none group"
             onClick={onToggleCollapse}
           >
-            <span className="text-xl shrink-0 group-hover:scale-110 transition-transform">
-              {workspace.isCompose ? '📁' : '📦'}
+            <span className="shrink-0 text-slate-300 group-hover:text-blue-400 group-hover:scale-110 transition-all">
+              {workspace.isCompose ? <FolderGit className="w-5 h-5" /> : <Package className="w-5 h-5" />}
             </span>
             <div className="min-w-0">
                <h3 className="font-bold text-slate-100 tracking-wide text-base uppercase font-mono truncate group-hover:text-blue-400 transition-colors">
@@ -49,8 +50,8 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
               <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono mt-0.5">
                 <span>{t('workspace.services')}: {workspace.containers.length} / {t('workspace.running')}: {runningCount}</span>
                 {workspace.engineName && (
-                  <span className="text-cyan-400 bg-cyan-950/20 px-1.5 py-0.2 rounded text-[9px] shrink-0">
-                    ⚙️ {workspace.engineName}
+                  <span className="flex items-center gap-1 text-cyan-400 bg-cyan-950/20 px-1.5 py-0.5 rounded text-[9px] shrink-0">
+                    <Settings className="w-3 h-3" /> {workspace.engineName}
                   </span>
                 )}
               </div>
@@ -66,9 +67,9 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                   onBatchStart?.(workspace.projectName);
                 }}
                 title={t('workspace.startAll')}
-                className="p-1 hover:text-emerald-400 hover:bg-slate-800 rounded transition text-xs"
+                className="p-1 hover:text-emerald-400 hover:bg-slate-800 rounded transition"
               >
-                ▶️
+                <Play className="w-4 h-4" />
               </button>
               <button
                 onClick={(e) => {
@@ -76,9 +77,9 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                   onBatchStop?.(workspace.projectName);
                 }}
                 title={t('workspace.stopAll')}
-                className="p-1 hover:text-rose-400 hover:bg-slate-800 rounded transition text-xs"
+                className="p-1 hover:text-rose-400 hover:bg-slate-800 rounded transition"
               >
-                ⏹️
+                <Square className="w-4 h-4" />
               </button>
             </div>
 
@@ -128,7 +129,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
       {/* Workspace footer */}
       <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mt-4 pt-3 border-t border-slate-800/60">
         <div>{t('workspace.totalServices', { count: workspace.containers.length })}</div>
-        <div className="flex items-center gap-1">📍 {t('workspace.localEnv')}</div>
+        <div className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {t('workspace.localEnv')}</div>
       </div>
     </div>
   );

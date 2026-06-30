@@ -24,13 +24,18 @@ type DockerClientInfo struct {
 	Cli  *client.Client
 }
 
+const statsRefreshInterval = 2 * time.Second
+
 // DockerService 封装了多个 Docker 守护进程的连接和操作
 type DockerService struct {
-	clients []DockerClientInfo
+	clients         []DockerClientInfo
+	statsCache      map[string]containerStatsResult
+	statsCacheMutex sync.RWMutex
+	cancelFunc      context.CancelFunc
 }
 
 // NewDockerService 创建并初始化多个 Docker 客户端连接
-func NewDockerService(engineConfigs []config.DockerEngineConfig) (*DockerService, error) {
+func NewDockerService(ctx context.Context, engineConfigs []config.DockerEngineConfig) (*DockerService, error) {
 	var clients []DockerClientInfo
 
 	for _, ec := range engineConfigs {
@@ -70,11 +75,23 @@ func NewDockerService(engineConfigs []config.DockerEngineConfig) (*DockerService
 		return nil, fmt.Errorf("没有成功初始化任何 Docker 引擎连接")
 	}
 
-	return &DockerService{clients: clients}, nil
+	ctx, cancel := context.WithCancel(ctx)
+	ds := &DockerService{
+		clients:    clients,
+		statsCache: make(map[string]containerStatsResult),
+		cancelFunc: cancel,
+	}
+
+	go ds.startStatsManager(ctx)
+
+	return ds, nil
 }
 
 // Close 关闭所有的 Docker 客户端连接
 func (s *DockerService) Close() {
+	if s.cancelFunc != nil {
+		s.cancelFunc()
+	}
 	for _, c := range s.clients {
 		if err := c.Cli.Close(); err != nil {
 			logger.Warnf("关闭 Docker 实例 [%s] 客户端连接失败: %v", c.Name, err)
@@ -196,20 +213,59 @@ type containerStatsResult struct {
 	memoryUsage int64
 }
 
-// fetchAllContainerStats 并发抓取所有容器的指标
-func (s *DockerService) fetchAllContainerStats(ctx context.Context, cli *client.Client, containerIDs []string) map[string]containerStatsResult {
+func (s *DockerService) startStatsManager(ctx context.Context) {
+	ticker := time.NewTicker(statsRefreshInterval)
+	defer ticker.Stop()
+
+	// Initial fetch
+	s.refreshStats(ctx)
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Infof("Stats manager stopped")
+			return
+		case <-ticker.C:
+			s.refreshStats(ctx)
+		}
+	}
+}
+
+func (s *DockerService) refreshStats(ctx context.Context) {
+	// First, gather all running containers from all clients
+	runningContainerIDs := make(map[string]*client.Client)
+
+	// We use a short timeout for listing containers to avoid blocking the ticker loop
+	listCtx, cancelList := context.WithTimeout(ctx, 3*time.Second)
+	defer cancelList()
+
+	for _, c := range s.clients {
+		rawContainers, err := c.Cli.ContainerList(listCtx, client.ContainerListOptions{All: false})
+		if err != nil {
+			logger.Warnf("定时抓取时无法获取实例 [%s] 容器列表: %v", c.Name, err)
+			continue
+		}
+		for _, cnt := range rawContainers.Items {
+			if strings.ToLower(string(cnt.State)) == "running" {
+				runningContainerIDs[cnt.ID] = c.Cli
+			}
+		}
+	}
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	results := make(map[string]containerStatsResult)
 
-	for _, id := range containerIDs {
+	for id, cli := range runningContainerIDs {
 		wg.Add(1)
-		go func(containerID string) {
+		go func(containerID string, dockerCli *client.Client) {
 			defer wg.Done()
-			cpu, mem, err := s.fetchContainerStats(ctx, cli, containerID)
+			cpu, mem, err := s.fetchContainerStats(ctx, dockerCli, containerID)
 			if err != nil {
-				logger.Warnf("抓取容器 [%s] 监控指标失败: %v", containerID, err)
-				return
+				// 发生错误时，记录日志并默认资源使用为 0
+				logger.Debugf("抓取容器 [%s] 监控指标失败 (可能正在停止): %v", containerID, err)
+				cpu = 0.0
+				mem = 0
 			}
 			mu.Lock()
 			results[containerID] = containerStatsResult{
@@ -217,11 +273,25 @@ func (s *DockerService) fetchAllContainerStats(ctx context.Context, cli *client.
 				memoryUsage: mem,
 			}
 			mu.Unlock()
-		}(id)
+		}(id, cli)
 	}
 
 	wg.Wait()
-	return results
+
+	s.statsCacheMutex.Lock()
+	defer s.statsCacheMutex.Unlock()
+
+	// 清理已经不在 running 状态的容器缓存
+	for cachedID := range s.statsCache {
+		if _, stillRunning := runningContainerIDs[cachedID]; !stillRunning {
+			delete(s.statsCache, cachedID)
+		}
+	}
+
+	// 更新抓取到的最新指标
+	for id, stats := range results {
+		s.statsCache[id] = stats
+	}
 }
 
 // GetProjectWorkspaces 获取所有实例下的项目工作区并进行整合
@@ -263,18 +333,7 @@ func (s *DockerService) getEngineWorkspaces(ctx context.Context, cli *client.Cli
 		return nil, fmt.Errorf("无法获取容器列表: %w", err)
 	}
 
-	// 2. 收集正在运行的容器 ID 用于性能指标抓取
-	var runningIDs []string
-	for _, c := range rawContainers.Items {
-		if strings.ToLower(string(c.State)) == "running" {
-			runningIDs = append(runningIDs, c.ID)
-		}
-	}
-
-	// 3. 并发抓取性能指标
-	statsMap := s.fetchAllContainerStats(ctx, cli, runningIDs)
-
-	// 4. 解析、格式化容器并归组到 Workspace 映射中
+	// 2. 解析、格式化容器并归组到 Workspace 映射中
 	workspaceMap := make(map[string]*models.ProjectWorkspace)
 	var standaloneWorkspace *models.ProjectWorkspace
 
@@ -301,13 +360,15 @@ func (s *DockerService) getEngineWorkspaces(ctx context.Context, cli *client.Cli
 			}
 		}
 
-		// 从并发收集到的 statsMap 中读取指标数据
+		// 从缓存中读取指标数据
 		var cpuUsage float64
 		var memUsage int64
-		if stats, exists := statsMap[c.ID]; exists {
+		s.statsCacheMutex.RLock()
+		if stats, exists := s.statsCache[c.ID]; exists {
 			cpuUsage = stats.cpuUsage
 			memUsage = stats.memoryUsage
 		}
+		s.statsCacheMutex.RUnlock()
 
 		info := models.ContainerInfo{
 			ID:          c.ID,
@@ -350,7 +411,7 @@ func (s *DockerService) getEngineWorkspaces(ctx context.Context, cli *client.Cli
 		}
 	}
 
-	// 5. 组装最终 slice 返回
+	// 3. 组装最终 slice 返回
 	var workspaces []models.ProjectWorkspace
 	for _, ws := range workspaceMap {
 		workspaces = append(workspaces, *ws)

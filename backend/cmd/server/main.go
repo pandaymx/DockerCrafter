@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"docker-dev-panel/config"
 	"docker-dev-panel/logger"
 	"docker-dev-panel/server"
@@ -12,7 +13,7 @@ func main() {
 	cfg := config.LoadConfig()
 
 	// 2. 初始化 Docker 服务（连接所有配置的 Docker 实例）
-	dockerService, err := service.NewDockerService(cfg.DockerEngines)
+	dockerService, err := service.NewDockerService(context.Background(), cfg.DockerEngines)
 	if err != nil {
 		logger.Fatalf("无法连接到任何 Docker 引擎: %v", err)
 	}
