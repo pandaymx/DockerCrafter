@@ -63,6 +63,14 @@ const resources = {
         status: "Status",
         internalPort: "Int",
         noPorts: "No external ports mapped"
+      },
+      logsModal: {
+        title: "Container Logs: [{{name}}]",
+        close: "Close",
+        autoScroll: "Auto Scroll",
+        refreshing: "Refreshing...",
+        fetchError: "Failed to fetch logs",
+        empty: "No logs available"
       }
     }
   },
@@ -126,6 +134,14 @@ const resources = {
         status: "状态",
         internalPort: "内部",
         noPorts: "未映射外部端口"
+      },
+      logsModal: {
+        title: "容器日志: [{{name}}]",
+        close: "关闭",
+        autoScroll: "自动滚动",
+        refreshing: "刷新中...",
+        fetchError: "获取日志失败",
+        empty: "暂无日志"
       }
     }
   }
