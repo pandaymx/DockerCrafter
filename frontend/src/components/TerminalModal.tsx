@@ -15,6 +15,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
   const terminalRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [shellType, setShellType] = useState<string>('Auto');
 
   useEffect(() => {
     let ws: WebSocket;
@@ -44,7 +45,8 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
       setLoading(true);
 
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/containers/exec/ws?id=${containerId}`;
+      const shellParam = shellType !== 'Auto' ? `&shell=${shellType}` : '';
+      const wsUrl = `${protocol}//${window.location.host}/api/containers/exec/ws?id=${containerId}${shellParam}`;
 
       ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
@@ -78,7 +80,8 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
         if (!event.wasClean) {
           setError(t('terminalModal.disconnected', { defaultValue: 'Disconnected' }));
         } else {
-          term.write('\r\n\x1b[33m[Disconnected]\x1b[0m\r\n');
+          const reason = event.reason || 'Disconnected';
+          term.write(`\r\n\x1b[33m[${reason}]\x1b[0m\r\n`);
         }
         setLoading(false);
       };
@@ -113,7 +116,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
       }
       term.dispose();
     };
-  }, [containerId, t]);
+  }, [containerId, t, shellType]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -140,6 +143,16 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
             )}
           </div>
           <div className="flex items-center gap-4">
+            <select
+              value={shellType}
+              onChange={(e) => setShellType(e.target.value)}
+              className="bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cyan-500 font-mono"
+            >
+              <option value="Auto">Auto (bash || sh)</option>
+              <option value="bash">bash</option>
+              <option value="sh">sh</option>
+              <option value="zsh">zsh</option>
+            </select>
             <button
               onClick={onClose}
               className="text-zinc-400 hover:text-rose-400 transition-colors p-1"
