@@ -102,7 +102,7 @@ func (s *Server) Start() error {
 	}
 
 	addr := ":" + s.cfg.Port
-	logger.Infof("🚀 后端服务已启动，监听地址为 http://localhost%s (日志级别: %s)", addr, s.cfg.LogLevel)
+	logger.Infof("🚀 后端服务已启动，监听地址为 http://localhost%s (版本: %s, 日志级别: %s)", addr, config.Version, s.cfg.LogLevel)
 	logger.Infof("🔍 API 接口地址: http://localhost%s/api/projects", addr)
 	logger.Infof("🏥 健康检查地址: http://localhost%s/api/health", addr)
 
