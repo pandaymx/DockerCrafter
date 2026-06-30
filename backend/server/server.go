@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/websocket"
 
@@ -34,15 +35,50 @@ func NewServer(cfg *config.Config, dockerService *service.DockerService) *Server
 	}
 }
 
+// corsMiddleware 处理动态 CORS 反射
+func (s *Server) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		allowedOrigins := strings.Split(s.cfg.CORS.AllowOrigin, ",")
+
+		isAllowed := false
+		for _, o := range allowedOrigins {
+			trimmed := strings.TrimSpace(o)
+			if trimmed == "*" || trimmed == origin {
+				isAllowed = true
+				break
+			}
+		}
+
+		// 如果匹配成功，动态返回该 Origin；如果不匹配则不返回跨域头
+		if isAllowed && origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", s.cfg.CORS.AllowMethods)
+			w.Header().Set("Access-Control-Allow-Headers", s.cfg.CORS.AllowHeaders)
+			w.Header().Set("Vary", "Origin")
+		}
+
+		if r.Method == http.MethodOptions {
+			if isAllowed {
+				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+			return
+		}
+
+		next(w, r)
+	}
+}
+
 // Start 注册路由并启动 HTTP 服务器监听
 func (s *Server) Start() error {
 	// 注册路由处理器
-	http.HandleFunc("/api/health", s.handleHealth)
-	http.HandleFunc("/api/projects", s.handleProjects)
-	http.HandleFunc("/api/containers/action", s.handleContainerAction)
-	http.HandleFunc("/api/containers/logs", s.handleContainerLogs)
-	http.HandleFunc("/api/containers/logs/ws", s.handleContainerLogsWS)
-	http.HandleFunc("/api/containers/exec", s.handleContainerExec)
+	http.HandleFunc("/api/health", s.corsMiddleware(s.handleHealth))
+	http.HandleFunc("/api/projects", s.corsMiddleware(s.handleProjects))
+	http.HandleFunc("/api/containers/action", s.corsMiddleware(s.handleContainerAction))
+	http.HandleFunc("/api/containers/logs", s.corsMiddleware(s.handleContainerLogs))
+	http.HandleFunc("/api/containers/exec", s.corsMiddleware(s.handleContainerExec))
 
 	addr := ":" + s.cfg.Port
 	logger.Infof("🚀 后端服务已启动，监听地址为 http://localhost%s (日志级别: %s)", addr, s.cfg.LogLevel)
@@ -54,15 +90,7 @@ func (s *Server) Start() error {
 
 // handleHealth 健康检查端点
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", s.cfg.CORS.AllowOrigin)
-	w.Header().Set("Access-Control-Allow-Methods", s.cfg.CORS.AllowMethods)
-	w.Header().Set("Access-Control-Allow-Headers", s.cfg.CORS.AllowHeaders)
 	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
 
 	logger.Debugf("收到健康检查请求来自: %s", r.RemoteAddr)
 
@@ -84,15 +112,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 // handleProjects 项目工作区列表端点
 func (s *Server) handleProjects(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", s.cfg.CORS.AllowOrigin)
-	w.Header().Set("Access-Control-Allow-Methods", s.cfg.CORS.AllowMethods)
-	w.Header().Set("Access-Control-Allow-Headers", s.cfg.CORS.AllowHeaders)
 	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
 
 	if r.Method != "GET" {
 		http.Error(w, "仅支持 GET 请求", http.StatusMethodNotAllowed)
@@ -117,15 +137,7 @@ func (s *Server) handleProjects(w http.ResponseWriter, r *http.Request) {
 
 // handleContainerAction 执行容器启动、停止或重启操作
 func (s *Server) handleContainerAction(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", s.cfg.CORS.AllowOrigin)
-	w.Header().Set("Access-Control-Allow-Methods", s.cfg.CORS.AllowMethods)
-	w.Header().Set("Access-Control-Allow-Headers", s.cfg.CORS.AllowHeaders)
 	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
 
 	if r.Method != "POST" {
 		http.Error(w, "仅支持 POST 请求", http.StatusMethodNotAllowed)
@@ -162,15 +174,7 @@ func (s *Server) handleContainerAction(w http.ResponseWriter, r *http.Request) {
 
 // handleContainerLogs 获取容器日志
 func (s *Server) handleContainerLogs(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", s.cfg.CORS.AllowOrigin)
-	w.Header().Set("Access-Control-Allow-Methods", s.cfg.CORS.AllowMethods)
-	w.Header().Set("Access-Control-Allow-Headers", s.cfg.CORS.AllowHeaders)
 	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
 
 	if r.Method != "GET" {
 		http.Error(w, "仅支持 GET 请求", http.StatusMethodNotAllowed)
@@ -203,15 +207,7 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, r *http.Request) {
 
 // handleContainerExec 在容器内执行命令
 func (s *Server) handleContainerExec(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", s.cfg.CORS.AllowOrigin)
-	w.Header().Set("Access-Control-Allow-Methods", s.cfg.CORS.AllowMethods)
-	w.Header().Set("Access-Control-Allow-Headers", s.cfg.CORS.AllowHeaders)
 	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
 
 	if r.Method != "POST" {
 		http.Error(w, "仅支持 POST 请求", http.StatusMethodNotAllowed)
