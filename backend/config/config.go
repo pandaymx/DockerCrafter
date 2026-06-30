@@ -10,10 +10,13 @@ import (
 
 // DockerEngineConfig 保存单个 Docker 守护进程的连接配置
 type DockerEngineConfig struct {
-	Name      string `yaml:"name"`
-	Host      string `yaml:"host"`
-	TLSVerify bool   `yaml:"tls_verify"`
-	CertPath  string `yaml:"cert_path"`
+	Name             string `yaml:"name"`
+	Host             string `yaml:"host"`
+	TLSVerify        bool   `yaml:"tls_verify"`
+	CertPath         string `yaml:"cert_path"`
+	CACertBase64     string `yaml:"ca_cert_base64"`
+	ClientCertBase64 string `yaml:"client_cert_base64"`
+	ClientKeyBase64  string `yaml:"client_key_base64"`
 }
 
 // CorsConfig 保存 CORS 相关的跨域配置

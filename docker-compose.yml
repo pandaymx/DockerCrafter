@@ -9,6 +9,13 @@ services:
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # 预留证书挂载路径 (如连接远程 Docker Daemon)
+      # - ./certs:/app/certs
+    # environment:
+      # 支持通过环境变量注入 Base64 编码的证书，无需在宿主机保存证书文件 (推荐)
+      # - DOCKER_CA_CERT_BASE64=${DOCKER_CA_CERT_BASE64}
+      # - DOCKER_CLIENT_CERT_BASE64=${DOCKER_CLIENT_CERT_BASE64}
+      # - DOCKER_CLIENT_KEY_BASE64=${DOCKER_CLIENT_KEY_BASE64}
     # We do NOT publish the port 12581 to the host to keep it secure.
     # Nginx in the frontend container will proxy to it via the internal network.
     networks:

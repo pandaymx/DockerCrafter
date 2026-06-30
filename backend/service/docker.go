@@ -3,9 +3,13 @@ package service
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -46,15 +50,72 @@ func NewDockerService(ctx context.Context, engineConfigs []config.DockerEngineCo
 			opts = append(opts, client.FromEnv)
 		} else {
 			// 远程 Docker
-			opts = append(opts, client.WithHost(ec.Host))
-
+			host := ec.Host
 			// TLS 加密支持
-			if ec.TLSVerify && ec.CertPath != "" {
-				caFile := filepath.Join(ec.CertPath, "ca.pem")
-				certFile := filepath.Join(ec.CertPath, "cert.pem")
-				keyFile := filepath.Join(ec.CertPath, "key.pem")
-				opts = append(opts, client.WithTLSClientConfig(caFile, certFile, keyFile))
+			if ec.TLSVerify {
+				if ec.CACertBase64 != "" && ec.ClientCertBase64 != "" && ec.ClientKeyBase64 != "" {
+					// 使用内存中的 Base64 证书配置 TLS (现代化无状态方案)
+					caCert, err := base64.StdEncoding.DecodeString(ec.CACertBase64)
+					if err != nil {
+						logger.Warnf("实例 [%s] 的 CA 证书 Base64 解码失败: %v", ec.Name, err)
+						continue
+					}
+					clientCert, err := base64.StdEncoding.DecodeString(ec.ClientCertBase64)
+					if err != nil {
+						logger.Warnf("实例 [%s] 的 Client 证书 Base64 解码失败: %v", ec.Name, err)
+						continue
+					}
+					clientKey, err := base64.StdEncoding.DecodeString(ec.ClientKeyBase64)
+					if err != nil {
+						logger.Warnf("实例 [%s] 的 Client 私钥 Base64 解码失败: %v", ec.Name, err)
+						continue
+					}
+
+					certPool := x509.NewCertPool()
+					if !certPool.AppendCertsFromPEM(caCert) {
+						logger.Warnf("实例 [%s] 无法从 Base64 解析并追加 CA 证书", ec.Name)
+						continue
+					}
+
+					cert, err := tls.X509KeyPair(clientCert, clientKey)
+					if err != nil {
+						logger.Warnf("实例 [%s] 加载客户端证书和私钥失败: %v", ec.Name, err)
+						continue
+					}
+
+					tlsConfig := &tls.Config{
+						RootCAs:      certPool,
+						Certificates: []tls.Certificate{cert},
+					}
+
+					httpClient := &http.Client{
+						Transport: &http.Transport{
+							TLSClientConfig: tlsConfig,
+						},
+					}
+					// If we provide a custom HTTP client for TLS, we must update the host scheme to https
+					// so the underlying Docker client correctly dials TLS instead of plaintext HTTP.
+					if strings.HasPrefix(host, "tcp://") {
+						host = strings.Replace(host, "tcp://", "https://", 1)
+					} else if !strings.HasPrefix(host, "https://") && !strings.HasPrefix(host, "http://") && !strings.HasPrefix(host, "unix://") && !strings.HasPrefix(host, "npipe://") {
+						host = "https://" + host
+					}
+
+					opts = append(opts, client.WithHTTPClient(httpClient))
+					logger.Infof("实例 [%s] 成功应用内存 Base64 TLS 配置", ec.Name)
+
+				} else if ec.CertPath != "" {
+					// 回退到传统的文件路径方案
+					caFile := filepath.Join(ec.CertPath, "ca.pem")
+					certFile := filepath.Join(ec.CertPath, "cert.pem")
+					keyFile := filepath.Join(ec.CertPath, "key.pem")
+					opts = append(opts, client.WithTLSClientConfig(caFile, certFile, keyFile))
+					logger.Infof("实例 [%s] 使用本地证书文件路径配置 TLS", ec.Name)
+				} else {
+					logger.Warnf("实例 [%s] 启用了 TLSVerify，但未提供 Base64 证书或证书路径", ec.Name)
+				}
 			}
+			opts = append(opts, client.WithHost(host))
 		}
 
 		opts = append(opts, client.WithAPIVersionNegotiation())
