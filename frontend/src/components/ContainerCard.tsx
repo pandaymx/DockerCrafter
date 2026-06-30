@@ -3,6 +3,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ContainerInfo } from '../types';
 import { formatBytes } from '../utils/format';
+import { Button, StatusBadge, ProgressBar } from './ui';
 import { Play, Square, RefreshCw, Terminal, SquareTerminal } from 'lucide-react';
 
 interface ContainerCardProps {
@@ -26,6 +27,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
   const isRunning = container.state === 'running';
 
   // Dynamic performance bar colors
+  const memMaxMock = 2 * 1024 * 1024 * 1024; // 2GB assumed limit for visualization
   const cpuColor = container.cpuUsage > 80 ? 'bg-rose-500' : container.cpuUsage > 40 ? 'bg-amber-500' : 'bg-cyan-500';
 
   // Use memoryLimit if valid, fallback to 2GB for visualization if 0
@@ -39,45 +41,55 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
         {/* Header: Name, State light, Action buttons */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2 min-w-0">
-            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-            <h4 className="font-mono font-bold text-slate-200 text-sm truncate max-w-[150px] sm:max-w-[180px]" title={container.name}>
-              {container.name}
-            </h4>
+            <StatusBadge status={container.state as any} showDot className="px-0 py-0 border-none bg-transparent">
+              <h4 className="font-mono font-bold text-slate-200 text-sm truncate max-w-[150px] sm:max-w-[180px] ml-1" title={container.name}>
+                {container.name}
+              </h4>
+            </StatusBadge>
             <span className="text-[11px] text-slate-400 font-mono shrink-0">({container.state})</span>
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-1.5 text-slate-400 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {isRunning ? (
-              <button
+              <Button
+                variant="icon"
+                size="icon"
                 onClick={() => onStop?.(container.id, container.name)}
                 title={t('container.stop')}
-                className="p-1 hover:text-rose-400 hover:bg-slate-700 rounded transition"
+                className="hover:text-rose-400"
               >
                 <Square className="w-4 h-4" />
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
+                variant="icon"
+                size="icon"
                 onClick={() => onStart?.(container.id, container.name)}
                 title={t('container.start')}
-                className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition"
+                className="hover:text-emerald-400"
               >
                 <Play className="w-4 h-4" />
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              variant="icon"
+              size="icon"
               onClick={() => onRestart?.(container.id, container.name)}
               title={t('container.restart')}
-              className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition"
+              className="hover:text-emerald-400"
             >
               <RefreshCw className="w-4 h-4" />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="icon"
+              size="icon"
               onClick={() => onLogs?.(container.id, container.name)}
               title={t('container.logs')}
-              className="p-1 hover:text-blue-400 hover:bg-slate-700 rounded transition"
+              className="hover:text-blue-400"
             >
               <Terminal className="w-4 h-4" />
+            </Button>
             </button>
             <button
               onClick={() => onTerminal?.(container.id, container.name)}
@@ -99,9 +111,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
               </div>
             </div>
             {isRunning && (
-              <div className="w-full bg-slate-950 h-1 rounded-full overflow-hidden mt-1.5">
-                <div className={`${cpuColor} h-full transition-all duration-300`} style={{ width: `${Math.min(container.cpuUsage, 100)}%` }} />
-              </div>
+              <ProgressBar value={container.cpuUsage} max={100} colorType="cpu" className="mt-1.5 h-1" />
             )}
           </div>
           
@@ -117,9 +127,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
               </div>
             </div>
             {isRunning && (
-              <div className="w-full bg-slate-950 h-1 rounded-full overflow-hidden mt-1.5">
-                <div className={`${memColor} h-full transition-all duration-300`} style={{ width: `${memPercentage}%` }} />
-              </div>
+              <ProgressBar value={container.memoryUsage} max={memMaxMock} colorType="memory" className="mt-1.5 h-1" />
             )}
           </div>
         </div>

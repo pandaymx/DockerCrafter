@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { FolderGit, Package, Settings, Play, Square, MapPin } from 'lucide-react';
 import type { ProjectWorkspace } from '../types';
 import { ContainerCard } from './ContainerCard';
+import { Button, StatusBadge, GlassPanel } from './ui';
+import { cn } from '../utils/cn';
 
 interface WorkspaceCardProps {
   workspace: ProjectWorkspace;
@@ -34,7 +36,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   const runningCount = workspace.containers.filter((c) => c.state === 'running').length;
 
   return (
-    <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-md flex flex-col justify-between h-full">
+    <GlassPanel className="p-5 flex flex-col justify-between h-full rounded-2xl bg-slate-900/80 border-slate-800">
       <div>
         {/* Workspace header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
@@ -63,51 +65,55 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
           <div className="flex items-center gap-3 shrink-0">
             {/* Batch actions */}
             <div className="flex items-center gap-1 bg-slate-950/40 p-0.5 rounded-lg border border-slate-800/40">
-              <button
+              <Button
+                variant="icon"
+                size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   onBatchStart?.(workspace.projectName);
                 }}
                 title={t('workspace.startAll')}
-                className="p-1 hover:text-emerald-400 hover:bg-slate-800 rounded transition"
+                className="hover:text-emerald-400 hover:bg-slate-800"
               >
                 <Play className="w-4 h-4" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="icon"
+                size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   onBatchStop?.(workspace.projectName);
                 }}
                 title={t('workspace.stopAll')}
-                className="p-1 hover:text-rose-400 hover:bg-slate-800 rounded transition"
+                className="hover:text-rose-400 hover:bg-slate-800"
               >
                 <Square className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
 
-            <span className="hidden sm:inline text-[10px] bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700/50 font-mono">
+            <StatusBadge status="unknown" showDot={false} className="hidden sm:inline">
               {workspace.isCompose ? t('workspace.composeProject') : t('workspace.standalone')}
-            </span>
+            </StatusBadge>
 
             {/* Collapse toggle */}
-            <button
+            <Button
+              variant="icon"
+              size="icon"
               onClick={onToggleCollapse}
-              className="text-slate-400 hover:text-slate-200 transition-colors p-1 hover:bg-slate-800/50 rounded"
               title={isCollapsed ? t('workspace.expand') : t('workspace.collapse')}
+              className="hover:bg-slate-800/50"
             >
               <svg
                 width="16"
                 height="16"
-                className={`h-4 w-4 transform transition-transform duration-200 ${
-                  isCollapsed ? 'rotate-90' : 'rotate-180'
-                }`}
+                className={cn("h-4 w-4 transform transition-transform duration-200", isCollapsed ? "rotate-90" : "rotate-180")}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -134,6 +140,6 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
         <div>{t('workspace.totalServices', { count: workspace.containers.length })}</div>
         <div className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {t('workspace.localEnv')}</div>
       </div>
-    </div>
+    </GlassPanel>
   );
 };
