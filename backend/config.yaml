@@ -24,3 +24,11 @@ docker_engines:
   #   host: "tcp://192.168.1.200:2376"
   #   tls_verify: true
   #   cert_path: "/home/panda/certs/prod" # 包含 ca.pem, cert.pem, key.pem 证书
+
+  # 现代云原生推荐方案：通过 Base64 编码在内存中直接注入 TLS 证书 (推荐配合环境变量使用)
+  # - name: "remote-cloud"
+  #   host: "tcp://192.168.1.201:2376"
+  #   tls_verify: true
+  #   ca_cert_base64: "${DOCKER_CA_CERT_BASE64}"
+  #   client_cert_base64: "${DOCKER_CLIENT_CERT_BASE64}"
+  #   client_key_base64: "${DOCKER_CLIENT_KEY_BASE64}"
