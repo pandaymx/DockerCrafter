@@ -1,10 +1,10 @@
 // src/components/ContainerCard.tsx
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Play, Square, RefreshCw, Terminal } from 'lucide-react';
 import type { ContainerInfo } from '../types';
 import { formatBytes } from '../utils/format';
 import { Button, StatusBadge, ProgressBar } from './ui';
+import { Play, Square, RefreshCw, Terminal, SquareTerminal } from 'lucide-react';
 
 interface ContainerCardProps {
   container: ContainerInfo;
@@ -12,6 +12,7 @@ interface ContainerCardProps {
   onStop?: (id: string, name: string) => void;
   onRestart?: (id: string, name: string) => void;
   onLogs?: (id: string, name: string) => void;
+  onTerminal?: (id: string, name: string) => void;
 }
 
 export const ContainerCard: React.FC<ContainerCardProps> = ({
@@ -20,12 +21,19 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
   onStop,
   onRestart,
   onLogs,
+  onTerminal,
 }) => {
   const { t } = useTranslation();
   const isRunning = container.state === 'running';
 
   // Dynamic performance bar colors
   const memMaxMock = 2 * 1024 * 1024 * 1024; // 2GB assumed limit for visualization
+  const cpuColor = container.cpuUsage > 80 ? 'bg-rose-500' : container.cpuUsage > 40 ? 'bg-amber-500' : 'bg-cyan-500';
+
+  // Use memoryLimit if valid, fallback to 2GB for visualization if 0
+  const memLimit = container.memoryLimit > 0 ? container.memoryLimit : 2 * 1024 * 1024 * 1024;
+  const memPercentage = Math.min((container.memoryUsage / memLimit) * 100, 100);
+  const memColor = memPercentage > 80 ? 'bg-rose-500' : memPercentage > 40 ? 'bg-amber-500' : 'bg-purple-500';
 
   return (
     <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 hover:border-blue-500/50 transition-all duration-200 shadow-lg backdrop-blur-sm flex flex-col justify-between">
@@ -82,6 +90,14 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
             >
               <Terminal className="w-4 h-4" />
             </Button>
+            </button>
+            <button
+              onClick={() => onTerminal?.(container.id, container.name)}
+              title={t('container.terminal', { defaultValue: 'Terminal' })}
+              className="p-1 hover:text-purple-400 hover:bg-slate-700 rounded transition"
+            >
+              <SquareTerminal className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -103,7 +119,11 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
             <div>
               <div className="text-slate-400 mb-0.5 text-[10px]">MEM</div>
               <div className="text-slate-100 font-bold text-sm">
-                {isRunning ? formatBytes(container.memoryUsage) : '0 B'}
+                {isRunning ? (
+                  <span>
+                    {formatBytes(container.memoryUsage)} <span className="text-slate-500 font-normal text-xs">/ {formatBytes(memLimit)}</span>
+                  </span>
+                ) : '0 B'}
               </div>
             </div>
             {isRunning && (

@@ -3,6 +3,7 @@ import type { ProjectWorkspace } from './types';
 import { formatBytes } from './utils/format';
 import { WorkspaceCard } from './components/WorkspaceCard';
 import { LogsModal } from './components/LogsModal';
+import { TerminalModal } from './components/TerminalModal';
 import { useTranslation } from 'react-i18next';
 import { GlassPanel, ProgressBar } from './components/ui';
 import { cn } from './utils/cn';
@@ -19,6 +20,7 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [selectedLogContainer, setSelectedLogContainer] = useState<{ id: string, name: string } | null>(null);
+  const [selectedTerminalContainer, setSelectedTerminalContainer] = useState<{ id: string, name: string } | null>(null);
 
   // 轮询数据
   const fetchData = () => {
@@ -464,6 +466,7 @@ export default function App() {
                 onContainerStop={(id, name) => handleContainerAction(id, "stop", "stop", name)}
                 onContainerRestart={(id, name) => handleContainerAction(id, "restart", "restart", name)}
                 onContainerLogs={(id, name) => setSelectedLogContainer({ id, name })}
+                    onContainerTerminal={(id, name) => setSelectedTerminalContainer({ id, name })}
               />
             ))}
           </div>
@@ -476,6 +479,14 @@ export default function App() {
           containerId={selectedLogContainer.id}
           containerName={selectedLogContainer.name}
           onClose={() => setSelectedLogContainer(null)}
+        />
+      )}
+
+      {selectedTerminalContainer && (
+        <TerminalModal
+          containerId={selectedTerminalContainer.id}
+          containerName={selectedTerminalContainer.name}
+          onClose={() => setSelectedTerminalContainer(null)}
         />
       )}
     </div>

@@ -10,10 +10,13 @@ import (
 
 // DockerEngineConfig 保存单个 Docker 守护进程的连接配置
 type DockerEngineConfig struct {
-	Name      string `yaml:"name"`
-	Host      string `yaml:"host"`
-	TLSVerify bool   `yaml:"tls_verify"`
-	CertPath  string `yaml:"cert_path"`
+	Name             string `yaml:"name"`
+	Host             string `yaml:"host"`
+	TLSVerify        bool   `yaml:"tls_verify"`
+	CertPath         string `yaml:"cert_path"`
+	CACertBase64     string `yaml:"ca_cert_base64"`
+	ClientCertBase64 string `yaml:"client_cert_base64"`
+	ClientKeyBase64  string `yaml:"client_key_base64"`
 }
 
 // CorsConfig 保存 CORS 相关的跨域配置
@@ -96,9 +99,9 @@ func LoadConfig() *Config {
 		}
 	}
 
-	// 6. 设置默认 CORS 配置（若未配置，默认全开以便开发调试）
+	// 6. 设置默认 CORS 配置（若未配置，默认限定在常见的本地前端开发端口，保障安全）
 	if corsCfg.AllowOrigin == "" {
-		corsCfg.AllowOrigin = "*"
+		corsCfg.AllowOrigin = "http://localhost:12580,http://localhost:5173"
 	}
 	if corsCfg.AllowMethods == "" {
 		corsCfg.AllowMethods = "GET, OPTIONS"
