@@ -1,0 +1,9 @@
+{
+  "frontend/**/*.{ts,tsx}": [
+    "bunx oxlint --deny=correctness --deny=suspicious",
+    "bunx prettier --write"
+  ],
+  "backend/**/*.go": [
+    "go fmt"
+  ]
+}
