@@ -4,8 +4,8 @@ import (
 	"flag"
 	"os"
 
-	"gopkg.in/yaml.v3"
 	"docker-dev-panel/logger"
+	"gopkg.in/yaml.v3"
 )
 
 // DockerEngineConfig 保存单个 Docker 守护进程的连接配置
@@ -30,6 +30,7 @@ type CorsConfig struct {
 type Config struct {
 	Port          string               `yaml:"port"`
 	LogLevel      string               `yaml:"log_level"`
+	DBPath        string               `yaml:"db_path"`
 	DockerEngines []DockerEngineConfig `yaml:"docker_engines"`
 	CORS          CorsConfig           `yaml:"cors"`
 }
@@ -40,6 +41,7 @@ func LoadConfig() *Config {
 	// 1. 设置默认值
 	resolvedPort := "12581"
 	resolvedLogLevel := "INFO"
+	resolvedDBPath := "./data/dockercrafter.db"
 	var engines []DockerEngineConfig
 	var corsCfg CorsConfig
 
@@ -62,6 +64,9 @@ func LoadConfig() *Config {
 			if yamlCfg.LogLevel != "" {
 				resolvedLogLevel = yamlCfg.LogLevel
 			}
+			if yamlCfg.DBPath != "" {
+				resolvedDBPath = yamlCfg.DBPath
+			}
 			engines = yamlCfg.DockerEngines
 			corsCfg = yamlCfg.CORS
 		}
@@ -73,6 +78,9 @@ func LoadConfig() *Config {
 	}
 	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
 		resolvedLogLevel = envLogLevel
+	}
+	if envDBPath := os.Getenv("DB_PATH"); envDBPath != "" {
+		resolvedDBPath = envDBPath
 	}
 	if envCorsOrigin, exists := os.LookupEnv("CORS_ALLOW_ORIGIN"); exists {
 		corsCfg.AllowOrigin = envCorsOrigin
@@ -117,6 +125,7 @@ func LoadConfig() *Config {
 	return &Config{
 		Port:          resolvedPort,
 		LogLevel:      logger.GetLevelString(),
+		DBPath:        resolvedDBPath,
 		DockerEngines: engines,
 		CORS:          corsCfg,
 	}
