@@ -179,7 +179,7 @@ func calculateMemoryUsage(stats *DockerStats) int64 {
 }
 
 // fetchContainerStats 异步抓取单个容器的性能指标
-func (s *DockerService) fetchContainerStats(ctx context.Context, cli *client.Client, containerID string) (float64, int64, int64, error) {
+func (s *DockerService) fetchContainerStats(ctx context.Context, cli *client.Client, containerID string) (float64, int64, error) {
 	// 设置 2 秒超时以防 Docker 守护进程无响应
 	ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
@@ -189,30 +189,28 @@ func (s *DockerService) fetchContainerStats(ctx context.Context, cli *client.Cli
 		IncludePreviousSample: true,
 	})
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, err
 	}
 	defer resp.Body.Close()
 
 	var stats DockerStats
 	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
 		if err == io.EOF {
-			return 0, 0, 0, nil
+			return 0, 0, nil
 		}
-		return 0, 0, 0, err
+		return 0, 0, err
 	}
 
 	cpuPercent := calculateCPUPercent(&stats)
 	memUsage := calculateMemoryUsage(&stats)
-	memLimit := int64(stats.MemoryStats.Limit)
 
-	return cpuPercent, memUsage, memLimit, nil
+	return cpuPercent, memUsage, nil
 }
 
 // containerStatsResult 保存并发抓取的结果
 type containerStatsResult struct {
 	cpuUsage    float64
 	memoryUsage int64
-	memoryLimit int64
 }
 
 func (s *DockerService) startStatsManager(ctx context.Context) {
@@ -262,19 +260,17 @@ func (s *DockerService) refreshStats(ctx context.Context) {
 		wg.Add(1)
 		go func(containerID string, dockerCli *client.Client) {
 			defer wg.Done()
-			cpu, mem, limit, err := s.fetchContainerStats(ctx, dockerCli, containerID)
+			cpu, mem, err := s.fetchContainerStats(ctx, dockerCli, containerID)
 			if err != nil {
 				// 发生错误时，记录日志并默认资源使用为 0
 				logger.Debugf("抓取容器 [%s] 监控指标失败 (可能正在停止): %v", containerID, err)
 				cpu = 0.0
 				mem = 0
-				limit = 0
 			}
 			mu.Lock()
 			results[containerID] = containerStatsResult{
 				cpuUsage:    cpu,
 				memoryUsage: mem,
-				memoryLimit: limit,
 			}
 			mu.Unlock()
 		}(id, cli)
@@ -367,12 +363,10 @@ func (s *DockerService) getEngineWorkspaces(ctx context.Context, cli *client.Cli
 		// 从缓存中读取指标数据
 		var cpuUsage float64
 		var memUsage int64
-		var memLimit int64
 		s.statsCacheMutex.RLock()
 		if stats, exists := s.statsCache[c.ID]; exists {
 			cpuUsage = stats.cpuUsage
 			memUsage = stats.memoryUsage
-			memLimit = stats.memoryLimit
 		}
 		s.statsCacheMutex.RUnlock()
 
@@ -386,7 +380,6 @@ func (s *DockerService) getEngineWorkspaces(ctx context.Context, cli *client.Cli
 			Labels:      c.Labels,
 			CpuUsage:    cpuUsage,
 			MemoryUsage: memUsage,
-			MemoryLimit: memLimit,
 		}
 
 		// 智能编排分组
@@ -537,78 +530,3 @@ func (s *DockerService) ContainerExec(ctx context.Context, id string, cmd []stri
 	return "", "", 0, fmt.Errorf("未找到容器: %s", id)
 }
 
-
-// ContainerLogsStream 实时获取并流式返回容器日志内容
-func (s *DockerService) ContainerLogsStream(ctx context.Context, id string, tail string, conn interface { WriteMessage(messageType int, data []byte) error }) error {
-	for _, clientInfo := range s.clients {
-		inspect, err := clientInfo.Cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
-		if err == nil {
-			reader, err := clientInfo.Cli.ContainerLogs(ctx, id, client.ContainerLogsOptions{
-				ShowStdout: true,
-				ShowStderr: true,
-				Tail:       tail,
-				Follow:     true,
-				Timestamps: false,
-			})
-			if err != nil {
-				return err
-			}
-			defer reader.Close()
-
-			// Start a goroutine to wait for context cancellation and close reader
-			go func() {
-				<-ctx.Done()
-				reader.Close()
-			}()
-
-			// We need websocket package but it's not imported in service.
-			// Let's pass an interface that has WriteMessage(int, []byte) error to avoid cyclical dependencies or importing websocket here if unnecessary.
-			// 1 == websocket.TextMessage
-
-			if inspect.Container.Config.Tty {
-				buf := make([]byte, 4096)
-				for {
-					n, err := reader.Read(buf)
-					if n > 0 {
-						if writeErr := conn.WriteMessage(1, buf[:n]); writeErr != nil {
-							return writeErr
-						}
-					}
-					if err != nil {
-						if err == io.EOF {
-							return nil
-						}
-						return err
-					}
-				}
-			} else {
-				// Use docker's stdcopy to demultiplex stdout and stderr
-				// StdCopy writes to io.Writer. We can create a custom writer that wraps the conn.WriteMessage.
-
-				stdoutWriter := &WSWriter{conn: conn}
-				stderrWriter := &WSWriter{conn: conn} // Could format differently if needed
-
-				_, err = stdcopy.StdCopy(stdoutWriter, stderrWriter, reader)
-				if err != nil && err != io.EOF {
-					return err
-				}
-				return nil
-			}
-		}
-	}
-	return fmt.Errorf("未找到容器: %s", id)
-}
-
-// WSWriter wraps a websocket connection to implement io.Writer
-type WSWriter struct {
-	conn interface { WriteMessage(messageType int, data []byte) error }
-}
-
-// Write implements io.Writer for WSWriter
-func (w *WSWriter) Write(p []byte) (n int, err error) {
-	err = w.conn.WriteMessage(1, p)
-	if err != nil {
-		return 0, err
-	}
-	return len(p), nil
-}

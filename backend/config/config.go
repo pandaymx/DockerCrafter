@@ -96,9 +96,9 @@ func LoadConfig() *Config {
 		}
 	}
 
-	// 6. 设置默认 CORS 配置（若未配置，默认限定在常见的本地前端开发端口，保障安全）
+	// 6. 设置默认 CORS 配置（若未配置，默认全开以便开发调试）
 	if corsCfg.AllowOrigin == "" {
-		corsCfg.AllowOrigin = "http://localhost:12580,http://localhost:5173"
+		corsCfg.AllowOrigin = "*"
 	}
 	if corsCfg.AllowMethods == "" {
 		corsCfg.AllowMethods = "GET, OPTIONS"
