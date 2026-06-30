@@ -78,7 +78,9 @@ func (s *Server) Start() error {
 	http.HandleFunc("/api/projects", s.corsMiddleware(s.handleProjects))
 	http.HandleFunc("/api/containers/action", s.corsMiddleware(s.handleContainerAction))
 	http.HandleFunc("/api/containers/logs", s.corsMiddleware(s.handleContainerLogs))
+	http.HandleFunc("/api/containers/logs/ws", s.corsMiddleware(s.handleContainerLogsWS))
 	http.HandleFunc("/api/containers/exec", s.corsMiddleware(s.handleContainerExec))
+	http.HandleFunc("/api/containers/exec/ws", s.corsMiddleware(s.handleContainerExecWS))
 
 	addr := ":" + s.cfg.Port
 	logger.Infof("🚀 后端服务已启动，监听地址为 http://localhost%s (日志级别: %s)", addr, s.cfg.LogLevel)
@@ -244,6 +246,33 @@ func (s *Server) handleContainerExec(w http.ResponseWriter, r *http.Request) {
 		"stderr":   stderr,
 		"exitCode": exitCode,
 	})
+}
+
+// handleContainerExecWS 通过 WebSocket 提供容器终端
+func (s *Server) handleContainerExecWS(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "缺少必要参数 id", http.StatusBadRequest)
+		return
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		logger.Errorf("WebSocket 升级失败: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	logger.Debugf("开始通过 WebSocket 开启容器终端: id=%s", id)
+
+	err = s.dockerService.ContainerExecWS(ctx, id, conn)
+	if err != nil {
+		logger.Errorf("容器终端 Stream 错误: %v", err)
+		conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Error: %v", err)))
+	}
 }
 
 // handleContainerLogsWS 通过 WebSocket 实时推送容器日志

@@ -1,9 +1,9 @@
 // src/components/ContainerCard.tsx
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Play, Square, RefreshCw, Terminal } from 'lucide-react';
 import type { ContainerInfo } from '../types';
 import { formatBytes } from '../utils/format';
+import { Play, Square, RefreshCw, Terminal, SquareTerminal } from 'lucide-react';
 
 interface ContainerCardProps {
   container: ContainerInfo;
@@ -11,6 +11,7 @@ interface ContainerCardProps {
   onStop?: (id: string, name: string) => void;
   onRestart?: (id: string, name: string) => void;
   onLogs?: (id: string, name: string) => void;
+  onTerminal?: (id: string, name: string) => void;
 }
 
 export const ContainerCard: React.FC<ContainerCardProps> = ({
@@ -19,6 +20,7 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
   onStop,
   onRestart,
   onLogs,
+  onTerminal,
 }) => {
   const { t } = useTranslation();
   const isRunning = container.state === 'running';
@@ -76,6 +78,13 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
               className="p-1 hover:text-blue-400 hover:bg-slate-700 rounded transition"
             >
               <Terminal className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onTerminal?.(container.id, container.name)}
+              title={t('container.terminal', { defaultValue: 'Terminal' })}
+              className="p-1 hover:text-purple-400 hover:bg-slate-700 rounded transition"
+            >
+              <SquareTerminal className="w-4 h-4" />
             </button>
           </div>
         </div>
