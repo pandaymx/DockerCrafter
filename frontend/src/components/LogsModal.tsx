@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button } from './ui';
 
 interface LogsModalProps {
   containerId: string;
@@ -78,15 +79,17 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
               />
               {t('logsModal.autoScroll')}
             </label>
-            <button
+            <Button
+              variant="icon"
+              size="icon"
               onClick={onClose}
-              className="text-zinc-400 hover:text-rose-400 transition-colors p-1"
               title={t('logsModal.close')}
+              className="text-zinc-400 hover:text-rose-400 hover:bg-transparent"
             >
               <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />
               </svg>
-            </button>
+            </Button>
           </div>
         </div>
 
