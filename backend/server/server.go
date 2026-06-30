@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -14,17 +15,11 @@ import (
 	"docker-dev-panel/service"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		// Allow all origins for dev/panel
-		return true
-	},
-}
-
 // Server 封装了应用服务器的 HTTP 路由和处理程序
 type Server struct {
 	cfg           *config.Config
 	dockerService *service.DockerService
+	upgrader      websocket.Upgrader
 }
 
 // NewServer 创建并初始化一个 Server 实例
@@ -32,6 +27,22 @@ func NewServer(cfg *config.Config, dockerService *service.DockerService) *Server
 	return &Server{
 		cfg:           cfg,
 		dockerService: dockerService,
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				origin := r.Header.Get("Origin")
+				if origin == "" {
+					return true
+				}
+				allowedOrigins := strings.Split(cfg.CORS.AllowOrigin, ",")
+				for _, o := range allowedOrigins {
+					trimmed := strings.TrimSpace(o)
+					if trimmed == "*" || trimmed == origin {
+						return true
+					}
+				}
+				return false
+			},
+		},
 	}
 }
 
@@ -88,6 +99,41 @@ func (s *Server) Start() error {
 	logger.Infof("🏥 健康检查地址: http://localhost%s/api/health", addr)
 
 	return http.ListenAndServe(addr, nil)
+}
+
+// startKeepAlive 启动 WebSocket 连接的心跳保活机制
+func (s *Server) startKeepAlive(ctx context.Context, conn *websocket.Conn) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(ctx)
+
+	// 设置初始读取超时时间为 40 秒
+	conn.SetReadDeadline(time.Now().Add(40 * time.Second))
+
+	// 收到 Pong 响应时重置超时时间
+	conn.SetPongHandler(func(appData string) error {
+		conn.SetReadDeadline(time.Now().Add(40 * time.Second))
+		return nil
+	})
+
+	// 启动定时器，每 30 秒发送一次 Ping 控制帧
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				// 设置写入 Ping 帧的超时时间
+				if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)); err != nil {
+					logger.Debugf("WebSocket 发送 Ping 失败，主动关闭连接: %v", err)
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+
+	return ctx, cancel
 }
 
 // handleHealth 健康检查端点
@@ -256,14 +302,14 @@ func (s *Server) handleContainerExecWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Errorf("WebSocket 升级失败: %v", err)
 		return
 	}
 	defer conn.Close()
 
-	ctx, cancel := context.WithCancel(r.Context())
+	ctx, cancel := s.startKeepAlive(r.Context(), conn)
 	defer cancel()
 
 	logger.Debugf("开始通过 WebSocket 开启容器终端: id=%s", id)
@@ -287,7 +333,7 @@ func (s *Server) handleContainerLogsWS(w http.ResponseWriter, r *http.Request) {
 		tail = "100"
 	}
 
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Errorf("WebSocket 升级失败: %v", err)
 		return
@@ -298,7 +344,7 @@ func (s *Server) handleContainerLogsWS(w http.ResponseWriter, r *http.Request) {
 	// This is necessary so the underlying connection can process control frames
 	// like ping/pong and close frames, and we can detect client disconnections
 	// to avoid leaking goroutines and log streams.
-	ctx, cancel := context.WithCancel(r.Context())
+	ctx, cancel := s.startKeepAlive(r.Context(), conn)
 	defer cancel()
 
 	go func() {
