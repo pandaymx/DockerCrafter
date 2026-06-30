@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import type { ProjectWorkspace } from "../types";
 import { ContainerCard } from "./ContainerCard";
-import { VirtualContainerList } from "./VirtualContainerList";
 import { Button, StatusBadge, GlassPanel } from "./ui";
 import { cn } from "../utils/cn";
 
@@ -186,22 +185,31 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
 
         {/* Containers grid list */}
         {!isCollapsed && (
-          <VirtualContainerList
-            items={workspace.containers}
-            itemHeight={240}
-            maxHeight={600}
-            renderItem={(container) => (
-              <ContainerCard
-                key={container.id}
-                container={container}
-                onStart={onContainerStart}
-                onStop={onContainerStop}
-                onRestart={onContainerRestart}
-                onLogs={onContainerLogs}
-                onTerminal={onContainerTerminal}
-              />
-            )}
-          />
+          <div
+            className="overflow-y-auto w-full pr-1 custom-scrollbar"
+            style={{ maxHeight: workspace.containers.length > 0 ? 600 : "auto" }}
+          >
+            <div
+              className={cn(
+                "grid gap-4",
+                workspace.containers.length === 1
+                  ? "grid-cols-1"
+                  : "grid-cols-1 md:grid-cols-2",
+              )}
+            >
+              {workspace.containers.map((container) => (
+                <ContainerCard
+                  key={container.id}
+                  container={container}
+                  onStart={onContainerStart}
+                  onStop={onContainerStop}
+                  onRestart={onContainerRestart}
+                  onLogs={onContainerLogs}
+                  onTerminal={onContainerTerminal}
+                />
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
