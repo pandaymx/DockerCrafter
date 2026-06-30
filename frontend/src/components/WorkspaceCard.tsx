@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { FolderGit, Package, Settings, Play, Square, MapPin } from 'lucide-react';
 import type { ProjectWorkspace } from '../types';
 import { ContainerCard } from './ContainerCard';
+import { VirtualContainerList } from './VirtualContainerList';
 import { Button, StatusBadge, GlassPanel } from './ui';
 import { cn } from '../utils/cn';
 
@@ -119,8 +120,11 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
 
         {/* Containers grid list */}
         {!isCollapsed && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {workspace.containers.map((container) => (
+          <VirtualContainerList
+            items={workspace.containers}
+            itemHeight={180}
+            maxHeight={600}
+            renderItem={(container) => (
               <ContainerCard
                 key={container.id}
                 container={container}
@@ -130,8 +134,8 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                 onLogs={onContainerLogs}
                 onTerminal={onContainerTerminal}
               />
-            ))}
-          </div>
+            )}
+          />
         )}
       </div>
 
