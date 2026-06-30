@@ -471,7 +471,7 @@ export default function App() {
                 onContainerStart={(id, name) => handleContainerAction(id, "start", "start", name)}
                 onContainerStop={(id, name) => handleContainerAction(id, "stop", "stop", name)}
                 onContainerRestart={(id, name) => handleContainerAction(id, "restart", "restart", name)}
-                onContainerLogs={(_id, _name) => showToast(t('toast.backendUpgradeTip'))}
+                onContainerLogs={(id, name) => setSelectedLogContainer({ id, name })}
               />
             ))}
           </div>
