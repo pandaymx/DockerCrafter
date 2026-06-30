@@ -297,6 +297,7 @@ func (s *Server) handleContainerExec(w http.ResponseWriter, r *http.Request) {
 // handleContainerExecWS 通过 WebSocket 提供容器终端
 func (s *Server) handleContainerExecWS(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
+	shell := r.URL.Query().Get("shell")
 	if id == "" {
 		http.Error(w, "缺少必要参数 id", http.StatusBadRequest)
 		return
@@ -312,9 +313,9 @@ func (s *Server) handleContainerExecWS(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := s.startKeepAlive(r.Context(), conn)
 	defer cancel()
 
-	logger.Debugf("开始通过 WebSocket 开启容器终端: id=%s", id)
+	logger.Debugf("开始通过 WebSocket 开启容器终端: id=%s, shell=%s", id, shell)
 
-	err = s.dockerService.ContainerExecWS(ctx, id, conn)
+	err = s.dockerService.ContainerExecWS(ctx, id, shell, conn)
 	if err != nil {
 		logger.Errorf("容器终端 Stream 错误: %v", err)
 		conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Error: %v", err)))

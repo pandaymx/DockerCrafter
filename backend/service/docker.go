@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/moby/moby/client"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"docker-dev-panel/config"
@@ -672,16 +673,25 @@ func (s *DockerService) ContainerLogsStream(ctx context.Context, id string, tail
 }
 
 // ContainerExecWS 开启容器 WebTerminal
-func (s *DockerService) ContainerExecWS(ctx context.Context, id string, conn interface {
+func (s *DockerService) ContainerExecWS(ctx context.Context, id string, shell string, conn interface {
 	WriteMessage(messageType int, data []byte) error
+	WriteControl(messageType int, data []byte, deadline time.Time) error
 	ReadMessage() (messageType int, p []byte, err error)
+	Close() error
 }) error {
 	for _, clientInfo := range s.clients {
 		_, err := clientInfo.Cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 		if err == nil {
-			// 先试 bash，不行再用 sh
+			var cmd []string
+			if shell == "bash" || shell == "sh" || shell == "zsh" {
+				cmd = []string{shell}
+			} else {
+				// 默认 fallback (Auto)
+				cmd = []string{"sh", "-c", "exec bash || exec sh"}
+			}
+
 			execConfig := client.ExecCreateOptions{
-				Cmd:          []string{"sh", "-c", "exec bash || exec sh"},
+				Cmd:          cmd,
 				AttachStdin:  true,
 				AttachStdout: true,
 				AttachStderr: true,
@@ -770,11 +780,17 @@ func (s *DockerService) ContainerExecWS(ctx context.Context, id string, conn int
 			// 等待任一方向发生错误（或者关闭）
 			select {
 			case <-ctx.Done():
+				conn.Close()
 				return ctx.Err()
 			case err := <-errChan:
 				if err == io.EOF {
+					// 正常退出 (例如用户输入 exit)
+					closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Process exited")
+					_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
+					conn.Close()
 					return nil
 				}
+				conn.Close()
 				return err
 			}
 		}
