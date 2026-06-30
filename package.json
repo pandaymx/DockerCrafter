@@ -14,6 +14,6 @@
   },
   "scripts": {
     "prepare": "husky",
-    "release": "bumpp package.json frontend/package.json --execute \"bunx conventional-changelog -p conventionalcommits ... \" "
+    "release": "bumpp package.json frontend/package.json --execute \"bunx conventional-changelog -p angular -i CHANGELOG.md -s -k frontend/package.json && git add CHANGELOG.md\" --commit \"chore(release): v%s\" --tag \"v%s\" --push"
   }
 }
