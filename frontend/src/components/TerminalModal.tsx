@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Terminal } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
-import '@xterm/xterm/css/xterm.css';
+import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import "@xterm/xterm/css/xterm.css";
 
 interface TerminalModalProps {
   containerId: string;
@@ -10,12 +10,16 @@ interface TerminalModalProps {
   onClose: () => void;
 }
 
-export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, containerName, onClose }) => {
+export const TerminalModal: React.FC<TerminalModalProps> = ({
+  containerId,
+  containerName,
+  onClose,
+}) => {
   const { t } = useTranslation();
   const terminalRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [shellType, setShellType] = useState<string>('Auto');
+  const [shellType, setShellType] = useState<string>("Auto");
 
   useEffect(() => {
     let ws: WebSocket;
@@ -27,11 +31,11 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
     const term = new Terminal({
       cursorBlink: true,
       theme: {
-        background: '#09090b', // zinc-950
-        foreground: '#d4d4d8', // zinc-300
-        cursor: '#22d3ee', // cyan-400
+        background: "#09090b", // zinc-950
+        foreground: "#d4d4d8", // zinc-300
+        cursor: "#22d3ee", // cyan-400
       },
-      fontFamily: 'monospace',
+      fontFamily: "monospace",
       fontSize: 14,
     });
 
@@ -44,12 +48,12 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
       if (ws) ws.close();
       setLoading(true);
 
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const shellParam = shellType !== 'Auto' ? `&shell=${shellType}` : '';
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const shellParam = shellType !== "Auto" ? `&shell=${shellType}` : "";
       const wsUrl = `${protocol}//${window.location.host}/api/containers/exec/ws?id=${containerId}${shellParam}`;
 
       ws = new WebSocket(wsUrl);
-      ws.binaryType = 'arraybuffer';
+      ws.binaryType = "arraybuffer";
 
       ws.onopen = () => {
         if (!isMounted) return;
@@ -57,12 +61,12 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
         setLoading(false);
         // Send initial resize
         const { cols, rows } = term;
-        ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+        ws.send(JSON.stringify({ type: "resize", cols, rows }));
       };
 
       ws.onmessage = (event) => {
         if (!isMounted) return;
-        if (typeof event.data === 'string') {
+        if (typeof event.data === "string") {
           term.write(event.data);
         } else {
           term.write(new Uint8Array(event.data));
@@ -71,16 +75,18 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
 
       ws.onerror = () => {
         if (!isMounted) return;
-        setError(t('terminalModal.fetchError') || 'WebSocket connection error');
+        setError(t("terminalModal.fetchError") || "WebSocket connection error");
         setLoading(false);
       };
 
       ws.onclose = (event) => {
         if (!isMounted) return;
         if (!event.wasClean) {
-          setError(t('terminalModal.disconnected', { defaultValue: 'Disconnected' }));
+          setError(
+            t("terminalModal.disconnected", { defaultValue: "Disconnected" }),
+          );
         } else {
-          const reason = event.reason || 'Disconnected';
+          const reason = event.reason || "Disconnected";
           term.write(`\r\n\x1b[33m[${reason}]\x1b[0m\r\n`);
         }
         setLoading(false);
@@ -89,14 +95,14 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
       // Handle user input
       term.onData((data) => {
         if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'input', data }));
+          ws.send(JSON.stringify({ type: "input", data }));
         }
       });
 
       // Handle resize
       term.onResize(({ cols, rows }) => {
         if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+          ws.send(JSON.stringify({ type: "resize", cols, rows }));
         }
       });
     };
@@ -106,11 +112,11 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
     const handleResize = () => {
       fitAddon.fit();
     };
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
 
     return () => {
       isMounted = false;
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener("resize", handleResize);
       if (ws) {
         ws.close();
       }
@@ -125,20 +131,44 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
         <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-900/50">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-mono font-bold text-zinc-100">
-              {t('terminalModal.title', { name: containerName, defaultValue: `Terminal - ${containerName}` })}
+              {t("terminalModal.title", {
+                name: containerName,
+                defaultValue: `Terminal - ${containerName}`,
+              })}
             </h2>
             {loading && (
               <span className="text-xs text-cyan-400 animate-pulse font-mono flex items-center gap-1">
-                <svg width="12" height="12" className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                <svg
+                  width="12"
+                  height="12"
+                  className="animate-spin h-3 w-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
                 </svg>
-                {t('terminalModal.connecting', { defaultValue: 'Connecting...' })}
+                {t("terminalModal.connecting", {
+                  defaultValue: "Connecting...",
+                })}
               </span>
             )}
             {error && (
               <span className="text-xs text-rose-500 font-mono flex items-center gap-1">
-                {error === 'terminalModal.disconnected' ? 'Disconnected' : error}
+                {error === "terminalModal.disconnected"
+                  ? "Disconnected"
+                  : error}
               </span>
             )}
           </div>
@@ -156,10 +186,21 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ containerId, conta
             <button
               onClick={onClose}
               className="text-zinc-400 hover:text-rose-400 transition-colors p-1"
-              title={t('terminalModal.close', { defaultValue: 'Close' })}
+              title={t("terminalModal.close", { defaultValue: "Close" })}
             >
-              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />
+              <svg
+                width="20"
+                height="20"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l18 18"
+                />
               </svg>
             </button>
           </div>
