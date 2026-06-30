@@ -13,11 +13,12 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/moby/moby/client"
-	"github.com/moby/moby/api/pkg/stdcopy"
+			"github.com/moby/moby/api/pkg/stdcopy"
 	"docker-dev-panel/config"
 	"docker-dev-panel/logger"
 	"docker-dev-panel/models"
@@ -37,6 +38,11 @@ type DockerService struct {
 	statsCache      map[string]containerStatsResult
 	statsCacheMutex sync.RWMutex
 	cancelFunc      context.CancelFunc
+
+	lastRequestTime time.Time
+	lastReqMutex    sync.Mutex
+	activeWSCount   atomic.Int32
+	statsWakeup     chan struct{}
 }
 
 // NewDockerService 创建并初始化多个 Docker 客户端连接
@@ -142,9 +148,11 @@ func NewDockerService(ctx context.Context, engineConfigs []config.DockerEngineCo
 		clients:    clients,
 		statsCache: make(map[string]containerStatsResult),
 		cancelFunc: cancel,
+		statsWakeup: make(chan struct{}, 1),
 	}
 
 	go ds.startStatsManager(ctx)
+	ds.startEventListeners(ctx)
 
 	return ds, nil
 }
@@ -278,18 +286,31 @@ type containerStatsResult struct {
 }
 
 func (s *DockerService) startStatsManager(ctx context.Context) {
-	ticker := time.NewTicker(statsRefreshInterval)
-	defer ticker.Stop()
-
 	// Initial fetch
 	s.refreshStats(ctx)
 
 	for {
+		s.lastReqMutex.Lock()
+		lastReq := s.lastRequestTime
+		s.lastReqMutex.Unlock()
+
+		interval := 15 * time.Second
+		if s.activeWSCount.Load() > 0 || time.Since(lastReq) < 5*time.Second {
+			interval = 2 * time.Second
+		}
+
+		timer := time.NewTimer(interval)
+
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			logger.Infof("Stats manager stopped")
 			return
-		case <-ticker.C:
+		case <-timer.C:
+			s.refreshStats(ctx)
+		case <-s.statsWakeup:
+			timer.Stop()
+			// Wake up early due to an event, refresh stats immediately
 			s.refreshStats(ctx)
 		}
 	}
@@ -362,6 +383,10 @@ func (s *DockerService) refreshStats(ctx context.Context) {
 
 // GetProjectWorkspaces 获取所有实例下的项目工作区并进行整合
 func (s *DockerService) GetProjectWorkspaces(ctx context.Context) ([]models.ProjectWorkspace, error) {
+	s.lastReqMutex.Lock()
+	s.lastRequestTime = time.Now()
+	s.lastReqMutex.Unlock()
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var allWorkspaces []models.ProjectWorkspace
@@ -608,6 +633,9 @@ type LogMessage struct {
 
 // ContainerLogsStream 实时获取并流式返回容器日志内容
 func (s *DockerService) ContainerLogsStream(ctx context.Context, id string, tail string, conn interface { WriteMessage(messageType int, data []byte) error }) error {
+	s.activeWSCount.Add(1)
+	defer s.activeWSCount.Add(-1)
+
 	for _, clientInfo := range s.clients {
 		inspect, err := clientInfo.Cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 		if err == nil {
@@ -679,6 +707,9 @@ func (s *DockerService) ContainerExecWS(ctx context.Context, id string, shell st
 	ReadMessage() (messageType int, p []byte, err error)
 	Close() error
 }) error {
+	s.activeWSCount.Add(1)
+	defer s.activeWSCount.Add(-1)
+
 	for _, clientInfo := range s.clients {
 		_, err := clientInfo.Cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 		if err == nil {
@@ -820,4 +851,65 @@ func (w *WSWriter) Write(p []byte) (n int, err error) {
 		return 0, err
 	}
 	return len(p), nil
+}
+
+
+// startEventListeners 启动全局的事件监听器，监听各实例容器生命周期变化
+func (s *DockerService) startEventListeners(ctx context.Context) {
+	for _, c := range s.clients {
+		go s.listenClientEvents(ctx, c)
+	}
+}
+
+// listenClientEvents 监听单个 Docker 引擎事件
+func (s *DockerService) listenClientEvents(ctx context.Context, c DockerClientInfo) {
+	f := make(client.Filters)
+	f["type"] = map[string]bool{"container": true}
+	f["event"] = map[string]bool{
+		"start":   true,
+		"stop":    true,
+		"die":     true,
+		"destroy": true,
+		"pause":   true,
+		"unpause": true,
+		"rename":  true,
+	}
+
+	options := client.EventsListOptions{
+		Filters: f,
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		logger.Infof("开始监听实例 [%s] 的 Docker Events", c.Name)
+		eventsResult := c.Cli.Events(ctx, options)
+
+	innerLoop:
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case err := <-eventsResult.Err:
+				if err != nil {
+					logger.Warnf("实例 [%s] 的 Events 监听断开: %v，将在 5 秒后重试", c.Name, err)
+				}
+				time.Sleep(5 * time.Second)
+				break innerLoop // 重新调用 c.Cli.Events()
+			case event := <-eventsResult.Messages:
+				logger.Debugf("收到实例 [%s] 容器事件: %s %s", c.Name, event.Action, event.Actor.ID)
+
+				// 通过非阻塞的方式通知 stats manager 立即刷新
+				select {
+				case s.statsWakeup <- struct{}{}:
+				default:
+					// 如果通道已满（即已经有一个 pending 的唤醒信号），则忽略，避免阻塞
+				}
+			}
+		}
+	}
 }

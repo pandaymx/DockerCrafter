@@ -75,7 +75,8 @@ export default function App() {
       });
       if (res.ok) {
         showToast(t(`toast.${actionName}Success`, `Successfully ${actionName}ed ${name}!`));
-        fetchData();
+        setTimeout(fetchData, 300); // 预留时间给后端 Events 缓存更新
+
       } else {
         const errData = await res.json().catch(() => ({}));
         showToast(t(`toast.${actionName}Error`, `Failed to ${actionName} ${name}: ${errData.error || res.statusText}`));
@@ -107,10 +108,12 @@ export default function App() {
 
       if (allOk) {
         showToast(t(`toast.${actionName}Success`, `Successfully ${actionName}ed workspace ${projectName}!`));
-        fetchData();
+        setTimeout(fetchData, 300);
+
       } else {
         showToast(t(`toast.${actionName}Error`, `Some containers failed to ${actionName} in ${projectName}`));
-        fetchData();
+        setTimeout(fetchData, 300);
+
       }
     } catch (err) {
       console.error(err);
