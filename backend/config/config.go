@@ -8,6 +8,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Version 保存应用程序的全局版本号，由 go build -ldflags 动态注入
+var Version = "dev"
+
 // DockerEngineConfig 保存单个 Docker 守护进程的连接配置
 type DockerEngineConfig struct {
 	Name             string `yaml:"name"`
