@@ -1,6 +1,7 @@
 // src/components/ContainerCard.tsx
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { Play, Square, RefreshCw, Terminal } from 'lucide-react';
 import type { ContainerInfo } from '../types';
 import { formatBytes } from '../utils/format';
 
@@ -47,32 +48,32 @@ export const ContainerCard: React.FC<ContainerCardProps> = ({
               <button
                 onClick={() => onStop?.(container.id, container.name)}
                 title={t('container.stop')}
-                className="p-1 hover:text-rose-400 hover:bg-slate-700 rounded transition text-xs"
+                className="p-1 hover:text-rose-400 hover:bg-slate-700 rounded transition"
               >
-                ⏹️
+                <Square className="w-4 h-4" />
               </button>
             ) : (
               <button
                 onClick={() => onStart?.(container.id, container.name)}
                 title={t('container.start')}
-                className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition text-xs"
+                className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition"
               >
-                ▶️
+                <Play className="w-4 h-4" />
               </button>
             )}
             <button
               onClick={() => onRestart?.(container.id, container.name)}
               title={t('container.restart')}
-              className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition text-xs"
+              className="p-1 hover:text-emerald-400 hover:bg-slate-700 rounded transition"
             >
-              🔄
+              <RefreshCw className="w-4 h-4" />
             </button>
             <button
               onClick={() => onLogs?.(container.id, container.name)}
               title={t('container.logs')}
-              className="p-1 hover:text-blue-400 hover:bg-slate-700 rounded transition font-mono text-xs"
+              className="p-1 hover:text-blue-400 hover:bg-slate-700 rounded transition"
             >
-              &gt;_
+              <Terminal className="w-4 h-4" />
             </button>
           </div>
         </div>
