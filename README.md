@@ -64,6 +64,16 @@ docker-dev-panel/
 
 ---
 
+## ⚠️ 部署与安全警告 / Deployment & Security Warning
+
+**[🇨🇳 中文警告]**
+DockerCrafter 核心功能依赖于挂载宿主机的 Docker Socket (`/var/run/docker.sock`)。这意味着应用拥有操作宿主机整个 Docker 引擎的权限。**如果在生产环境中面向最终用户公开部署，请务必不要将前端面板直接暴露在公网！** 任何访问到此面板的人都将获得控制您宿主机的最高权限。如果在公网访问不可避免，请强烈建议在 Nginx/反向代理层配置严格的身份认证（例如 Basic Auth），以及额外的网络隔离层。
+
+**[🇬🇧 English Warning]**
+DockerCrafter requires access to the host's Docker Socket (`/var/run/docker.sock`) to function. This grants the application full privileges over the host's Docker daemon. **DO NOT expose this panel to the public internet in a production environment without strict protections!** Anyone who can access the frontend dashboard will have ultimate control over your host system. If public exposure is absolutely necessary, strongly enforce strict authentication (such as Nginx Basic Auth) and implement additional network isolation layers.
+
+---
+
 ## 🛠️ 运行与开发 / How to Run
 
 ### 📋 前提条件 / Prerequisites

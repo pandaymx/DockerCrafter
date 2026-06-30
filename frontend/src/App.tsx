@@ -84,7 +84,7 @@ export default function App() {
     actionName: string,
     name: string,
   ) => {
-    showToast(t(`toast.${actionName}ing`, `${actionName}ing ${name}...`));
+    showToast(t(`toast.${actionName}ing`, { name, defaultValue: `${actionName}ing ${name}...` }));
     try {
       const res = await fetch("/api/containers/action", {
         method: "POST",
@@ -92,27 +92,15 @@ export default function App() {
         body: JSON.stringify({ id, action }),
       });
       if (res.ok) {
-        showToast(
-          t(
-            `toast.${actionName}Success`,
-            `Successfully ${actionName}ed ${name}!`,
-          ),
-        );
+        showToast(t(`toast.${actionName}Success`, { name, defaultValue: `Successfully ${actionName}ed ${name}!` }));
         setTimeout(fetchData, 300); // 预留时间给后端 Events 缓存更新
       } else {
         const errData = await res.json().catch(() => ({}));
-        showToast(
-          t(
-            `toast.${actionName}Error`,
-            `Failed to ${actionName} ${name}: ${errData.error || res.statusText}`,
-          ),
-        );
+        showToast(t(`toast.${actionName}Error`, { name, defaultValue: `Failed to ${actionName} ${name}: ${errData.error || res.statusText}` }));
       }
     } catch (err) {
       console.error(err);
-      showToast(
-        t(`toast.${actionName}Error`, `Failed to ${actionName} ${name}`),
-      );
+      showToast(t(`toast.${actionName}Error`, { name, defaultValue: `Failed to ${actionName} ${name}` }));
     }
   };
 
@@ -125,12 +113,7 @@ export default function App() {
     const workspace = workspaces.find((ws) => ws.projectName === projectName);
     if (!workspace) return;
 
-    showToast(
-      t(
-        `toast.${actionName}ing`,
-        `${actionName}ing workspace ${projectName}...`,
-      ),
-    );
+    showToast(t(`toast.${actionName}ing`, { name: `workspace ${projectName}`, defaultValue: `${actionName}ing workspace ${projectName}...` }));
 
     try {
       const promises = workspace.containers.map((c) =>
@@ -145,30 +128,15 @@ export default function App() {
       const allOk = results.every((r) => r.ok);
 
       if (allOk) {
-        showToast(
-          t(
-            `toast.${actionName}Success`,
-            `Successfully ${actionName}ed workspace ${projectName}!`,
-          ),
-        );
+        showToast(t(`toast.${actionName}Success`, { name: `workspace ${projectName}`, defaultValue: `Successfully ${actionName}ed workspace ${projectName}!` }));
         setTimeout(fetchData, 300);
       } else {
-        showToast(
-          t(
-            `toast.${actionName}Error`,
-            `Some containers failed to ${actionName} in ${projectName}`,
-          ),
-        );
+        showToast(t(`toast.${actionName}Error`, { name: `workspace ${projectName}`, defaultValue: `Some containers failed to ${actionName} in ${projectName}` }));
         setTimeout(fetchData, 300);
       }
     } catch (err) {
       console.error(err);
-      showToast(
-        t(
-          `toast.${actionName}Error`,
-          `Failed to ${actionName} workspace ${projectName}`,
-        ),
-      );
+      showToast(t(`toast.${actionName}Error`, { name: `workspace ${projectName}`, defaultValue: `Failed to ${actionName} workspace ${projectName}` }));
     }
   };
 
