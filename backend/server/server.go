@@ -214,7 +214,7 @@ func (s *Server) handleContainerAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Infof("执行容器操作: id=%s, action=%s", req.ID, req.Action)
+	logger.Debugf("执行容器操作: id=%s, action=%s", req.ID, req.Action)
 
 	err := s.dockerService.ContainerAction(r.Context(), req.ID, req.Action)
 	if err != nil {
@@ -284,7 +284,7 @@ func (s *Server) handleContainerExec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Infof("执行容器内命令: id=%s, cmd=%v", req.ID, req.Cmd)
+	logger.Debugf("执行容器内命令: id=%s, cmd=%v", req.ID, req.Cmd)
 
 	stdout, stderr, exitCode, err := s.dockerService.ContainerExec(r.Context(), req.ID, req.Cmd)
 	if err != nil {

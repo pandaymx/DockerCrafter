@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from "react";
 
 interface VirtualContainerListProps<T> {
   items: T[];
@@ -14,7 +14,7 @@ export function VirtualContainerList<T>({
   renderItem,
   itemHeight,
   maxHeight = 600, // standard max height
-  className = '',
+  className = "",
   gap = 16, // tailwind gap-4 is 16px
 }: VirtualContainerListProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -28,8 +28,8 @@ export function VirtualContainerList<T>({
     };
 
     updateColumns();
-    window.addEventListener('resize', updateColumns);
-    return () => window.removeEventListener('resize', updateColumns);
+    window.addEventListener("resize", updateColumns);
+    return () => window.removeEventListener("resize", updateColumns);
   }, []);
 
   // Row calculations
@@ -64,16 +64,22 @@ export function VirtualContainerList<T>({
       ref={containerRef}
       onScroll={handleScroll}
       className={`overflow-y-auto w-full ${className}`}
-      style={{ maxHeight: items.length > 0 ? maxHeight : 'auto' }}
+      style={{ maxHeight: items.length > 0 ? maxHeight : "auto" }}
     >
-      <div style={{ height: items.length > 0 ? totalHeight : 'auto', position: 'relative' }}>
+      <div
+        style={{
+          height: items.length > 0 ? totalHeight : "auto",
+          position: "relative",
+        }}
+      >
         <div
           style={{
-            position: items.length > 0 ? 'absolute' : 'static',
+            position: items.length > 0 ? "absolute" : "static",
             top: 0,
             left: 0,
             right: 0,
-            transform: items.length > 0 ? `translateY(${paddingTop}px)` : 'none',
+            transform:
+              items.length > 0 ? `translateY(${paddingTop}px)` : "none",
           }}
           className="grid grid-cols-1 md:grid-cols-2 gap-4"
         >
