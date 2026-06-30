@@ -15,6 +15,7 @@ interface WorkspaceCardProps {
   onContainerStop?: (id: string, name: string) => void;
   onContainerRestart?: (id: string, name: string) => void;
   onContainerLogs?: (id: string, name: string) => void;
+  onContainerTerminal?: (id: string, name: string) => void;
 }
 
 export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
@@ -27,6 +28,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   onContainerStop,
   onContainerRestart,
   onContainerLogs,
+  onContainerTerminal,
 }) => {
   const { t } = useTranslation();
   const runningCount = workspace.containers.filter((c) => c.state === 'running').length;
@@ -120,6 +122,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                 onStop={onContainerStop}
                 onRestart={onContainerRestart}
                 onLogs={onContainerLogs}
+                onTerminal={onContainerTerminal}
               />
             ))}
           </div>
