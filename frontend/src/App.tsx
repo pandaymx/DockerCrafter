@@ -17,7 +17,7 @@ export default function App() {
   const [typeFilter, setTypeFilter] = useState<"all" | "compose" | "standalone">("all");
   const [sortBy, setSortBy] = useState<"name" | "containers" | "cpu" | "memory">("name");
   const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Record<string, boolean>>({});
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<{ id: string, message: string }[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [selectedLogContainer, setSelectedLogContainer] = useState<{ id: string, name: string } | null>(null);
   const [selectedTerminalContainer, setSelectedTerminalContainer] = useState<{ id: string, name: string } | null>(null);
@@ -46,9 +46,13 @@ export default function App() {
 
   // 辅助函数：弹出提示
   const showToast = (message: string) => {
-    setToastMessage(message);
-    setTimeout(() => setToastMessage(null), 3500);
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3500);
   };
+
 
   // 切换折叠状态
   const toggleCollapse = (name: string) => {
@@ -211,14 +215,16 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-16">
       
       {/* Toast 弹出提示层 */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 glass-panel bg-slate-900 border-cyan-500/30 text-cyan-400 px-4 py-3 rounded-lg shadow-2xl flex items-center gap-3 animate-bounce">
-          <svg width="20" height="20" className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className="text-sm font-medium">{toastMessage}</span>
-        </div>
-      )}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
+        {toasts.map((toast) => (
+          <div key={toast.id} className="glass-panel bg-slate-900 border-cyan-500/30 text-cyan-400 px-4 py-3 rounded-lg shadow-2xl flex items-center gap-3 animate-bounce pointer-events-auto transition-all">
+            <svg width="20" height="20" className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm font-medium">{toast.message}</span>
+          </div>
+        ))}
+      </div>
 
       {/* 顶部通栏 Header */}
       <header className="border-b border-slate-900 bg-slate-900/40 backdrop-blur sticky top-0 z-30">
