@@ -469,3 +469,78 @@ func (s *DockerService) ContainerExec(ctx context.Context, id string, cmd []stri
 	return "", "", 0, fmt.Errorf("未找到容器: %s", id)
 }
 
+
+// ContainerLogsStream 实时获取并流式返回容器日志内容
+func (s *DockerService) ContainerLogsStream(ctx context.Context, id string, tail string, conn interface { WriteMessage(messageType int, data []byte) error }) error {
+	for _, clientInfo := range s.clients {
+		inspect, err := clientInfo.Cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
+		if err == nil {
+			reader, err := clientInfo.Cli.ContainerLogs(ctx, id, client.ContainerLogsOptions{
+				ShowStdout: true,
+				ShowStderr: true,
+				Tail:       tail,
+				Follow:     true,
+				Timestamps: false,
+			})
+			if err != nil {
+				return err
+			}
+			defer reader.Close()
+
+			// Start a goroutine to wait for context cancellation and close reader
+			go func() {
+				<-ctx.Done()
+				reader.Close()
+			}()
+
+			// We need websocket package but it's not imported in service.
+			// Let's pass an interface that has WriteMessage(int, []byte) error to avoid cyclical dependencies or importing websocket here if unnecessary.
+			// 1 == websocket.TextMessage
+
+			if inspect.Container.Config.Tty {
+				buf := make([]byte, 4096)
+				for {
+					n, err := reader.Read(buf)
+					if n > 0 {
+						if writeErr := conn.WriteMessage(1, buf[:n]); writeErr != nil {
+							return writeErr
+						}
+					}
+					if err != nil {
+						if err == io.EOF {
+							return nil
+						}
+						return err
+					}
+				}
+			} else {
+				// Use docker's stdcopy to demultiplex stdout and stderr
+				// StdCopy writes to io.Writer. We can create a custom writer that wraps the conn.WriteMessage.
+
+				stdoutWriter := &WSWriter{conn: conn}
+				stderrWriter := &WSWriter{conn: conn} // Could format differently if needed
+
+				_, err = stdcopy.StdCopy(stdoutWriter, stderrWriter, reader)
+				if err != nil && err != io.EOF {
+					return err
+				}
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("未找到容器: %s", id)
+}
+
+// WSWriter wraps a websocket connection to implement io.Writer
+type WSWriter struct {
+	conn interface { WriteMessage(messageType int, data []byte) error }
+}
+
+// Write implements io.Writer for WSWriter
+func (w *WSWriter) Write(p []byte) (n int, err error) {
+	err = w.conn.WriteMessage(1, p)
+	if err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
