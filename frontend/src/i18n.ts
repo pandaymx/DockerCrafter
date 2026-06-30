@@ -78,7 +78,8 @@ const resources = {
         autoScroll: "Auto Scroll",
         refreshing: "Refreshing...",
         fetchError: "Failed to fetch logs",
-        empty: "No logs available"
+        empty: "No logs available",
+        truncatedWarning: "[Notice] Early logs truncated to maintain performance. Buffer limit: {{limit}} lines."
       }
     }
   },
@@ -157,7 +158,8 @@ const resources = {
         autoScroll: "自动滚动",
         refreshing: "刷新中...",
         fetchError: "获取日志失败",
-        empty: "暂无日志"
+        empty: "暂无日志",
+        truncatedWarning: "[提示] 已截断早期日志以维持性能，当前缓冲区限制：{{limit}} 行"
       }
     }
   }

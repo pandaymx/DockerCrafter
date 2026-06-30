@@ -8,14 +8,18 @@ interface LogsModalProps {
   onClose: () => void;
 }
 
-interface LogFragment {
+interface LogLine {
+  id: string;
   type: string;
-  data: string;
+  text: string;
 }
+
+const MAX_LOG_LINES = 1000;
 
 export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName, onClose }) => {
   const { t } = useTranslation();
-  const [logs, setLogs] = useState<LogFragment[]>([]);
+  const [logs, setLogs] = useState<LogLine[]>([]);
+  const [isTruncated, setIsTruncated] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [autoScroll, setAutoScroll] = useState<boolean>(true);
@@ -29,10 +33,18 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
     let isMounted = true;
     const maxRetries = 5;
 
+    // Counter to generate unique stable IDs
+    let logIdCounter = 0;
+
+    // Buffer for incomplete chunks
+    let buffer = '';
+
     const connectWS = () => {
       if (ws) ws.close();
       setLoading(true);
       setLogs([]); // Clear logs before reconnecting to prevent duplicating trailing logs
+      setIsTruncated(false);
+      buffer = '';
 
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${protocol}//${window.location.host}/api/containers/logs/ws?id=${containerId}&tail=100`;
@@ -46,32 +58,48 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
       };
 
       ws.onmessage = (event) => {
-        let newFragment: LogFragment;
+        let fragmentType = 'stdout';
+        let fragmentData = '';
         try {
           const parsed = JSON.parse(event.data);
-          newFragment = {
-            type: parsed.type || 'stdout',
-            data: parsed.data || '',
-          };
+          fragmentType = parsed.type || 'stdout';
+          fragmentData = parsed.data || '';
         } catch {
           // Fallback for non-JSON strings (e.g. legacy backend or errors)
-          newFragment = {
-            type: 'stdout',
-            data: event.data,
-          };
+          fragmentType = 'stdout';
+          fragmentData = event.data;
         }
 
+        if (!fragmentData) return;
+
+        // Combine with any previously buffered incomplete line
+        const textToProcess = buffer + fragmentData;
+
+        // If it doesn't end with a newline, hold the last line in the buffer
+        let lines = textToProcess.split('\n');
+        if (!textToProcess.endsWith('\n')) {
+          buffer = lines.pop() || '';
+        } else {
+          buffer = '';
+          // Avoid an empty line at the very end
+          lines.pop();
+        }
+
+        if (lines.length === 0) return;
+
+        const newLines: LogLine[] = lines.map(text => ({
+          id: `log-${logIdCounter++}`,
+          type: fragmentType,
+          text: text,
+        }));
+
         setLogs((prev) => {
-          if (prev.length === 0) return [newFragment];
-          const last = prev[prev.length - 1];
-          if (last.type === newFragment.type) {
-            // Merge chunks to reduce DOM size and rendering load
-            return [
-              ...prev.slice(0, prev.length - 1),
-              { type: last.type, data: last.data + newFragment.data },
-            ];
+          const combined = [...prev, ...newLines];
+          if (combined.length > MAX_LOG_LINES) {
+            setIsTruncated(true);
+            return combined.slice(-MAX_LOG_LINES);
           }
-          return [...prev, newFragment];
+          return combined;
         });
       };
 
@@ -165,14 +193,19 @@ export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName
           {error ? (
             <div className="text-rose-500 font-mono text-sm">{error}</div>
           ) : logs.length > 0 ? (
-            <pre className="font-mono text-xs leading-relaxed whitespace-pre-wrap break-all">
-              {logs.map((frag, idx) => (
-                <span key={idx} className={frag.type === 'stderr' ? 'text-rose-400' : 'text-zinc-300'}>
-                  {frag.data}
-                </span>
+            <div className="font-mono text-xs leading-relaxed break-all">
+              {isTruncated && (
+                <div className="text-zinc-500 italic mb-2 select-none">
+                  {t('logsModal.truncatedWarning', { limit: MAX_LOG_LINES })}
+                </div>
+              )}
+              {logs.map((line) => (
+                <div key={line.id} className={line.type === 'stderr' ? 'text-rose-400 whitespace-pre-wrap min-h-[1em]' : 'text-zinc-300 whitespace-pre-wrap min-h-[1em]'}>
+                  {line.text}
+                </div>
               ))}
               <div ref={logEndRef} />
-            </pre>
+            </div>
           ) : (
             <div className="text-zinc-600 font-mono text-sm italic">
               {loading ? '' : t('logsModal.empty')}
