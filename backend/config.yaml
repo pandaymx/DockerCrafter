@@ -3,9 +3,11 @@ port: "12581"
 log_level: "INFO"       # 可选：DEBUG, INFO, WARN, ERROR
 
 # CORS (跨域请求) 配置
+# allow_origin 默认限定为常见开发端口以确保安全。支持逗号分隔多个来源。
+# 生产环境中由于使用 Nginx 同源反向代理，无需配置此项，留空或使用默认值即可。
 cors:
-  allow_origin: "*"
-  allow_methods: "GET, OPTIONS"
+  allow_origin: "http://localhost:12580,http://localhost:5173"
+  allow_methods: "GET, POST, OPTIONS, PUT, DELETE"
   allow_headers: "Content-Type"
 
 # 多个 Docker 实例连接配置 (支持本地、远程和加密远程连接)
