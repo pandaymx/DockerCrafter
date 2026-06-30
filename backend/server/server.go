@@ -1,16 +1,27 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/gorilla/websocket"
+
 	"docker-dev-panel/config"
 	"docker-dev-panel/logger"
 	"docker-dev-panel/service"
 )
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		// Allow all origins for dev/panel
+		return true
+	},
+}
 
 // Server 封装了应用服务器的 HTTP 路由和处理程序
 type Server struct {
@@ -209,4 +220,49 @@ func (s *Server) handleContainerExec(c *gin.Context) {
 		"stderr":   stderr,
 		"exitCode": exitCode,
 	})
+}
+
+// handleContainerLogsWS 通过 WebSocket 实时推送容器日志
+func (s *Server) handleContainerLogsWS(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	tail := r.URL.Query().Get("tail")
+	if id == "" {
+		http.Error(w, "缺少必要参数 id", http.StatusBadRequest)
+		return
+	}
+	if tail == "" {
+		tail = "100"
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		logger.Errorf("WebSocket 升级失败: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	// Start a goroutine to continuously read messages.
+	// This is necessary so the underlying connection can process control frames
+	// like ping/pong and close frames, and we can detect client disconnections
+	// to avoid leaking goroutines and log streams.
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	go func() {
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				cancel()
+				return
+			}
+		}
+	}()
+
+	logger.Debugf("开始通过 WebSocket 获取容器日志: id=%s, tail=%s", id, tail)
+
+	err = s.dockerService.ContainerLogsStream(ctx, id, tail, conn)
+	if err != nil {
+		logger.Errorf("容器日志 Stream 错误: %v", err)
+		// Try to send error to client before closing
+		conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Error: %v", err)))
+	}
 }
