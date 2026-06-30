@@ -1,4 +1,4 @@
-FROM oven/bun:latest AS builder
+FROM --platform=$BUILDPLATFORM oven/bun:latest AS builder
 
 WORKDIR /app
 
