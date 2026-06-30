@@ -34,7 +34,33 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   onContainerTerminal,
 }) => {
   const { t } = useTranslation();
+  const totalCount = workspace.containers.length;
   const runningCount = workspace.containers.filter((c) => c.state === 'running').length;
+
+  let workspaceStatus: 'running-all' | 'running-partial' | 'stopped-all' = 'stopped-all';
+  if (runningCount === totalCount && totalCount > 0) {
+    workspaceStatus = 'running-all';
+  } else if (runningCount > 0) {
+    workspaceStatus = 'running-partial';
+  }
+
+  const iconColorClass = cn("transition-all", {
+    "text-emerald-500 group-hover:text-emerald-400": workspaceStatus === 'running-all',
+    "text-amber-500 group-hover:text-amber-400": workspaceStatus === 'running-partial',
+    "text-slate-500 group-hover:text-slate-400": workspaceStatus === 'stopped-all',
+  });
+
+  const getStatusText = () => {
+    if (workspace.isCompose) {
+      if (workspaceStatus === 'running-all') return t('workspace.status.composeRunning');
+      if (workspaceStatus === 'running-partial') return t('workspace.status.composePartial');
+      return t('workspace.status.composeStopped');
+    } else {
+      if (workspaceStatus === 'running-all') return t('workspace.status.standaloneRunning');
+      if (workspaceStatus === 'running-partial') return t('workspace.status.standalonePartial');
+      return t('workspace.status.standaloneStopped');
+    }
+  };
 
   return (
     <GlassPanel className="p-5 flex flex-col justify-between h-full rounded-2xl bg-slate-900/80 border-slate-800">
@@ -45,7 +71,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
             className="flex items-center gap-2.5 min-w-0 cursor-pointer select-none group"
             onClick={onToggleCollapse}
           >
-            <span className="shrink-0 text-slate-300 group-hover:text-blue-400 group-hover:scale-110 transition-all">
+            <span className={cn("shrink-0 group-hover:scale-110", iconColorClass)}>
               {workspace.isCompose ? <FolderGit className="w-5 h-5" /> : <Package className="w-5 h-5" />}
             </span>
             <div className="min-w-0">
@@ -92,8 +118,8 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
               </Button>
             </div>
 
-            <StatusBadge status="unknown" showDot={false} className="hidden sm:inline">
-              {workspace.isCompose ? t('workspace.composeProject') : t('workspace.standalone')}
+            <StatusBadge status={workspaceStatus} showDot={true} className="hidden sm:inline">
+              {getStatusText()}
             </StatusBadge>
 
             {/* Collapse toggle */}

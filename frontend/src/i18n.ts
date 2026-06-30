@@ -47,6 +47,14 @@ const resources = {
         running: "RUNNING",
         composeProject: "Compose Project",
         standalone: "Standalone",
+        status: {
+          composeRunning: "Compose Running",
+          standaloneRunning: "Standalone Running",
+          composePartial: "Compose Partial",
+          standalonePartial: "Standalone Partial",
+          composeStopped: "Compose Stopped",
+          standaloneStopped: "Standalone Stopped"
+        },
         totalServices: "TOTAL SERVICES: {{count}}",
         localEnv: "LOCAL ENVIRONMENT",
         startAll: "Start all containers in workspace",
@@ -118,6 +126,14 @@ const resources = {
         running: "运行中",
         composeProject: "Compose 项目",
         standalone: "独立容器",
+        status: {
+          composeRunning: "Compose 运行中",
+          standaloneRunning: "独立容器运行中",
+          composePartial: "Compose 部分运行",
+          standalonePartial: "独立容器部分运行",
+          composeStopped: "Compose 已停止",
+          standaloneStopped: "独立容器已停止"
+        },
         totalServices: "服务总数: {{count}}",
         localEnv: "本地环境",
         startAll: "启动工作区所有容器",
