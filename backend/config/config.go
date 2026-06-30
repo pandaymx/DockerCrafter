@@ -74,6 +74,9 @@ func LoadConfig() *Config {
 	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
 		resolvedLogLevel = envLogLevel
 	}
+	if envCorsOrigin, exists := os.LookupEnv("CORS_ALLOW_ORIGIN"); exists {
+		corsCfg.AllowOrigin = envCorsOrigin
+	}
 
 	// 4. 尝试从命令行参数读取并覆盖
 	var flagPort string
@@ -99,10 +102,8 @@ func LoadConfig() *Config {
 		}
 	}
 
-	// 6. 设置默认 CORS 配置（若未配置，默认限定在常见的本地前端开发端口，保障安全）
-	if corsCfg.AllowOrigin == "" {
-		corsCfg.AllowOrigin = "http://localhost:12580,http://localhost:5173"
-	}
+	// 6. 设置默认 CORS 配置
+	// 修改：默认开启无 CORS 头限制（空），以适配生产环境中 Nginx 反向代理
 	if corsCfg.AllowMethods == "" {
 		corsCfg.AllowMethods = "GET, OPTIONS"
 	}
