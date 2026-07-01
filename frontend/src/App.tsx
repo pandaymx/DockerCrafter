@@ -4,14 +4,14 @@ import { formatBytes } from "./utils/format";
 import { WorkspaceCard } from "./components/WorkspaceCard";
 import { LogsModal } from "./components/LogsModal";
 import { TerminalModal } from "./components/TerminalModal";
-import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { useTranslation } from "react-i18next";
+import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { GlassPanel, ProgressBar } from "./components/ui";
 import { cn } from "./utils/cn";
 import { useDebounce } from "./hooks/useDebounce";
 
 export default function App() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [workspaces, setWorkspaces] = useState<ProjectWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -66,7 +66,7 @@ export default function App() {
       Date.now().toString() + Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, message }]);
     setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
+      setToasts((prev) => prev.filter((toastItem) => toastItem.id !== id));
     }, 3500);
   };
 
@@ -85,7 +85,12 @@ export default function App() {
     actionName: string,
     name: string,
   ) => {
-    showToast(t(`toast.${actionName}ing`, { name, defaultValue: `${actionName}ing ${name}...` }));
+    showToast(
+      t(`toast.${actionName}ing`, {
+        name,
+        defaultValue: `${actionName}ing ${name}...`,
+      }),
+    );
     try {
       const res = await fetch("/api/containers/action", {
         method: "POST",
@@ -93,28 +98,48 @@ export default function App() {
         body: JSON.stringify({ id, action }),
       });
       if (res.ok) {
-        showToast(t(`toast.${actionName}Success`, { name, defaultValue: `Successfully ${actionName}ed ${name}!` }));
+        showToast(
+          t(`toast.${actionName}Success`, {
+            name,
+            defaultValue: `Successfully ${actionName}ed ${name}!`,
+          }),
+        );
         setTimeout(fetchData, 300); // 预留时间给后端 Events 缓存更新
       } else {
         const errData = await res.json().catch(() => ({}));
-        showToast(t(`toast.${actionName}Error`, { name, defaultValue: `Failed to ${actionName} ${name}: ${errData.error || res.statusText}` }));
+        showToast(
+          t(`toast.${actionName}Error`, {
+            name,
+            defaultValue: `Failed to ${actionName} ${name}: ${errData.error || res.statusText}`,
+          }),
+        );
       }
     } catch (err) {
       console.error(err);
-      showToast(t(`toast.${actionName}Error`, { name, defaultValue: `Failed to ${actionName} ${name}` }));
+      showToast(
+        t(`toast.${actionName}Error`, {
+          name,
+          defaultValue: `Failed to ${actionName} ${name}`,
+        }),
+      );
     }
   };
 
   // 处理工作区批量操作
   const handleBatchAction = async (
     projectName: string,
-    action: "start" | "stop",
+    action: "start" | "stop" | "restart",
     actionName: string,
   ) => {
     const workspace = workspaces.find((ws) => ws.projectName === projectName);
     if (!workspace) return;
 
-    showToast(t(`toast.${actionName}ing`, { name: `workspace ${projectName}`, defaultValue: `${actionName}ing workspace ${projectName}...` }));
+    showToast(
+      t(`toast.${actionName}ing`, {
+        name: `workspace ${projectName}`,
+        defaultValue: `${actionName}ing workspace ${projectName}...`,
+      }),
+    );
 
     try {
       const promises = workspace.containers.map((c) =>
@@ -129,15 +154,30 @@ export default function App() {
       const allOk = results.every((r) => r.ok);
 
       if (allOk) {
-        showToast(t(`toast.${actionName}Success`, { name: `workspace ${projectName}`, defaultValue: `Successfully ${actionName}ed workspace ${projectName}!` }));
+        showToast(
+          t(`toast.${actionName}Success`, {
+            name: `workspace ${projectName}`,
+            defaultValue: `Successfully ${actionName}ed workspace ${projectName}!`,
+          }),
+        );
         setTimeout(fetchData, 300);
       } else {
-        showToast(t(`toast.${actionName}Error`, { name: `workspace ${projectName}`, defaultValue: `Some containers failed to ${actionName} in ${projectName}` }));
+        showToast(
+          t(`toast.${actionName}Error`, {
+            name: `workspace ${projectName}`,
+            defaultValue: `Some containers failed to ${actionName} in ${projectName}`,
+          }),
+        );
         setTimeout(fetchData, 300);
       }
     } catch (err) {
       console.error(err);
-      showToast(t(`toast.${actionName}Error`, { name: `workspace ${projectName}`, defaultValue: `Failed to ${actionName} workspace ${projectName}` }));
+      showToast(
+        t(`toast.${actionName}Error`, {
+          name: `workspace ${projectName}`,
+          defaultValue: `Failed to ${actionName} workspace ${projectName}`,
+        }),
+      );
     }
   };
 
@@ -297,7 +337,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-2xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-emerald-400 bg-clip-text text-transparent">
-              🐳 {t("title")} v1.0
+              🐳 {t("title")}
             </h1>
             <p className="text-slate-400 text-xs mt-1 font-mono">
               {t("subtitle", { lastUpdated: lastUpdated || t("syncing") })}
@@ -666,6 +706,9 @@ export default function App() {
                   handleBatchAction(name, "start", "start")
                 }
                 onBatchStop={(name) => handleBatchAction(name, "stop", "stop")}
+                onBatchRestart={(name) =>
+                  handleBatchAction(name, "restart", "restart")
+                }
                 onContainerStart={(id, name) =>
                   handleContainerAction(id, "start", "start", name)
                 }

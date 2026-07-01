@@ -1,5 +1,5 @@
 // src/components/WorkspaceCard.tsx
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FolderGit,
@@ -8,6 +8,9 @@ import {
   Play,
   Square,
   MapPin,
+  RotateCw,
+  MoreHorizontal,
+  AlertTriangle,
 } from "lucide-react";
 import type { ProjectWorkspace } from "../types";
 import { ContainerCard } from "./ContainerCard";
@@ -20,6 +23,7 @@ interface WorkspaceCardProps {
   onToggleCollapse?: () => void;
   onBatchStart?: (projectName: string) => void;
   onBatchStop?: (projectName: string) => void;
+  onBatchRestart?: (projectName: string) => void;
   onContainerStart?: (id: string, name: string) => void;
   onContainerStop?: (id: string, name: string) => void;
   onContainerRestart?: (id: string, name: string) => void;
@@ -33,6 +37,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   onToggleCollapse,
   onBatchStart,
   onBatchStop,
+  onBatchRestart,
   onContainerStart,
   onContainerStop,
   onContainerRestart,
@@ -40,10 +45,30 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   onContainerTerminal,
 }) => {
   const { t } = useTranslation();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isStopModalOpen, setIsStopModalOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const totalCount = workspace.containers.length;
   const runningCount = workspace.containers.filter(
     (c) => c.state === "running",
   ).length;
+
+  // Handle clicking outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isDropdownOpen]);
 
   let workspaceStatus: "running-all" | "running-partial" | "stopped-all" =
     "stopped-all";
@@ -116,7 +141,10 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
 
           <div className="flex items-center gap-3 shrink-0">
             {/* Batch actions */}
-            <div className="flex items-center gap-1 bg-slate-950/40 p-0.5 rounded-lg border border-slate-800/40">
+            <div
+              className="flex items-center gap-1 bg-slate-950/40 p-0.5 rounded-lg border border-slate-800/40 relative"
+              ref={dropdownRef}
+            >
               <Button
                 variant="icon"
                 size="icon"
@@ -134,13 +162,43 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                 size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onBatchStop?.(workspace.projectName);
+                  onBatchRestart?.(workspace.projectName);
                 }}
-                title={t("workspace.stopAll")}
-                className="hover:text-rose-400 hover:bg-slate-800"
+                title={t("workspace.restartAll")}
+                className="hover:text-blue-400 hover:bg-slate-800"
               >
-                <Square className="w-4 h-4" />
+                <RotateCw className="w-4 h-4" />
               </Button>
+              <Button
+                variant="icon"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsDropdownOpen(!isDropdownOpen);
+                }}
+                title={t("workspace.moreActions")}
+                className="hover:text-slate-300 hover:bg-slate-800"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+
+              {/* Dropdown Menu */}
+              {isDropdownOpen && (
+                <div className="absolute top-full right-0 mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden z-40 py-1">
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm text-rose-500 hover:bg-rose-500/10 hover:text-rose-400 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDropdownOpen(false);
+                      setIsStopModalOpen(true);
+                    }}
+                    disabled={workspaceStatus === "stopped-all"}
+                  >
+                    <Square className="w-4 h-4" />
+                    {t("workspace.stopAll")}
+                  </button>
+                </div>
+              )}
             </div>
 
             <StatusBadge
@@ -222,6 +280,41 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
           <MapPin className="w-3 h-3" /> {t("workspace.localEnv")}
         </div>
       </div>
+
+      {/* Confirmation Modal for Batch Stop */}
+      {isStopModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-rose-950/20 max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-4 mb-4 text-rose-500">
+              <div className="p-3 bg-rose-500/10 rounded-full">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold">
+                {t("workspace.batchStopConfirmTitle")}
+              </h3>
+            </div>
+
+            <p className="text-slate-300 mb-6 leading-relaxed">
+              {t("workspace.batchStopConfirm", { count: totalCount })}
+            </p>
+
+            <div className="flex items-center justify-end gap-3">
+              <Button variant="ghost" onClick={() => setIsStopModalOpen(false)}>
+                {t("workspace.cancel")}
+              </Button>
+              <Button
+                className="bg-rose-950/50 text-rose-500 hover:bg-rose-600 hover:text-white border border-rose-900/50"
+                onClick={() => {
+                  setIsStopModalOpen(false);
+                  onBatchStop?.(workspace.projectName);
+                }}
+              >
+                {t("workspace.confirmStop")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </GlassPanel>
   );
 };
