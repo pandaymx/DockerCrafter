@@ -11,7 +11,7 @@ import { cn } from "./utils/cn";
 import { useDebounce } from "./hooks/useDebounce";
 
 export default function App() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [workspaces, setWorkspaces] = useState<ProjectWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
