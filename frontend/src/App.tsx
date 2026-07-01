@@ -1,4 +1,3 @@
-import React from "react";
 import { useEffect, useState, useMemo } from "react";
 import type { ProjectWorkspace } from "./types";
 import { formatBytes } from "./utils/format";
