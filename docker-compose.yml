@@ -6,7 +6,21 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: dockercrafter-backend
-    restart: always
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # 预留证书挂载路径 (如连接远程 Docker Daemon)
@@ -26,7 +40,19 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: dockercrafter-frontend
-    restart: always
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
       - "12580:80"
     depends_on:
