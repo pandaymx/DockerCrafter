@@ -13,7 +13,8 @@ COPY . .
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} GOARM=${TARGETVARIANT#v} go build -ldflags="-s -w" -v -o dockercrafter-backend ./cmd/server
+ARG VERSION=dev
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} GOARM=${TARGETVARIANT#v} go build -ldflags="-s -w -X docker-dev-panel/config.Version=${VERSION}" -v -o dockercrafter-backend ./cmd/server
 
 # Final stage
 FROM scratch

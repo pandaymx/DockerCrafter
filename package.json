@@ -6,12 +6,14 @@
     "@commitlint/cli": "^21.2.0",
     "@commitlint/config-conventional": "^21.2.0",
     "bumpp": "^11.1.0",
+    "conventional-changelog-cli": "^5.0.0",
+    "conventional-changelog-conventionalcommits": "^10.2.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
     "prettier": "^3.9.4"
   },
   "scripts": {
     "prepare": "husky",
-    "release": "bumpp --commit --tag --push"
+    "release": "bumpp package.json frontend/package.json --execute \"bunx conventional-changelog -p angular -i CHANGELOG.md -s -k frontend/package.json && git add CHANGELOG.md\" --commit \"chore(release): v%s\" --tag \"v%s\" --push"
   }
 }
