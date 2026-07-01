@@ -4,8 +4,6 @@
   "rules": {
     "react/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "error",
-    "react/only-export-components": ["error", { "allowConstantExport": true }],
-    "react/react-in-jsx-scope": "off",
-    "react/jsx-no-undef": "off"
+    "react/only-export-components": ["error", { "allowConstantExport": true }]
   }
 }

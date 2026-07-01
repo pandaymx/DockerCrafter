@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from "react";
-import { useTranslation } from "react-i18next";
-import { Button } from "./ui";
+import React, { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Button } from './ui';
 
 interface LogsModalProps {
   containerId: string;
@@ -16,11 +16,7 @@ interface LogLine {
 
 const MAX_LOG_LINES = 1000;
 
-export const LogsModal: React.FC<LogsModalProps> = ({
-  containerId,
-  containerName,
-  onClose,
-}) => {
+export const LogsModal: React.FC<LogsModalProps> = ({ containerId, containerName, onClose }) => {
   const { t } = useTranslation();
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [isTruncated, setIsTruncated] = useState<boolean>(false);
@@ -41,16 +37,16 @@ export const LogsModal: React.FC<LogsModalProps> = ({
     let logIdCounter = 0;
 
     // Buffer for incomplete chunks
-    let buffer = "";
+    let buffer = '';
 
     const connectWS = () => {
       if (ws) ws.close();
       setLoading(true);
       setLogs([]); // Clear logs before reconnecting to prevent duplicating trailing logs
       setIsTruncated(false);
-      buffer = "";
+      buffer = '';
 
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${protocol}//${window.location.host}/api/containers/logs/ws?id=${containerId}&tail=100`;
 
       ws = new WebSocket(wsUrl);
@@ -62,15 +58,15 @@ export const LogsModal: React.FC<LogsModalProps> = ({
       };
 
       ws.onmessage = (event) => {
-        let fragmentType = "stdout";
-        let fragmentData = "";
+        let fragmentType = 'stdout';
+        let fragmentData = '';
         try {
           const parsed = JSON.parse(event.data);
-          fragmentType = parsed.type || "stdout";
-          fragmentData = parsed.data || "";
+          fragmentType = parsed.type || 'stdout';
+          fragmentData = parsed.data || '';
         } catch {
           // Fallback for non-JSON strings (e.g. legacy backend or errors)
-          fragmentType = "stdout";
+          fragmentType = 'stdout';
           fragmentData = event.data;
         }
 
@@ -80,18 +76,18 @@ export const LogsModal: React.FC<LogsModalProps> = ({
         const textToProcess = buffer + fragmentData;
 
         // If it doesn't end with a newline, hold the last line in the buffer
-        let lines = textToProcess.split("\n");
-        if (!textToProcess.endsWith("\n")) {
-          buffer = lines.pop() || "";
+        let lines = textToProcess.split('\n');
+        if (!textToProcess.endsWith('\n')) {
+          buffer = lines.pop() || '';
         } else {
-          buffer = "";
+          buffer = '';
           // Avoid an empty line at the very end
           lines.pop();
         }
 
         if (lines.length === 0) return;
 
-        const newLines: LogLine[] = lines.map((text) => ({
+        const newLines: LogLine[] = lines.map(text => ({
           id: `log-${logIdCounter++}`,
           type: fragmentType,
           text: text,
@@ -108,7 +104,7 @@ export const LogsModal: React.FC<LogsModalProps> = ({
       };
 
       ws.onerror = () => {
-        setError(t("logsModal.fetchError") || "WebSocket connection error");
+        setError(t('logsModal.fetchError') || 'WebSocket connection error');
         setLoading(false);
       };
 
@@ -124,7 +120,7 @@ export const LogsModal: React.FC<LogsModalProps> = ({
             connectWS();
           }, timeout);
         } else {
-          setError("Connection lost. Max retries reached.");
+          setError('Connection lost. Max retries reached.');
           setLoading(false);
         }
       };
@@ -145,7 +141,7 @@ export const LogsModal: React.FC<LogsModalProps> = ({
 
   useEffect(() => {
     if (autoScroll && logEndRef.current) {
-      logEndRef.current.scrollIntoView({ behavior: "smooth" });
+      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [logs, autoScroll]);
 
@@ -156,32 +152,15 @@ export const LogsModal: React.FC<LogsModalProps> = ({
         <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-900/50">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-mono font-bold text-zinc-100">
-              {t("logsModal.title", { name: containerName })}
+              {t('logsModal.title', { name: containerName })}
             </h2>
             {loading && (
               <span className="text-xs text-cyan-400 animate-pulse font-mono flex items-center gap-1">
-                <svg
-                  width="12"
-                  height="12"
-                  className="animate-spin h-3 w-3"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
+                <svg width="12" height="12" className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                {t("logsModal.refreshing")}
+                {t('logsModal.refreshing')}
               </span>
             )}
           </div>
@@ -193,28 +172,17 @@ export const LogsModal: React.FC<LogsModalProps> = ({
                 onChange={(e) => setAutoScroll(e.target.checked)}
                 className="rounded border-zinc-700 bg-zinc-900 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-zinc-900"
               />
-              {t("logsModal.autoScroll")}
+              {t('logsModal.autoScroll')}
             </label>
             <Button
               variant="icon"
               size="icon"
               onClick={onClose}
-              title={t("logsModal.close")}
+              title={t('logsModal.close')}
               className="text-zinc-400 hover:text-rose-400 hover:bg-transparent"
             >
-              <svg
-                width="20"
-                height="20"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l18 18"
-                />
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />
               </svg>
             </Button>
           </div>
@@ -228,18 +196,11 @@ export const LogsModal: React.FC<LogsModalProps> = ({
             <div className="font-mono text-xs leading-relaxed break-all">
               {isTruncated && (
                 <div className="text-zinc-500 italic mb-2 select-none">
-                  {t("logsModal.truncatedWarning", { limit: MAX_LOG_LINES })}
+                  {t('logsModal.truncatedWarning', { limit: MAX_LOG_LINES })}
                 </div>
               )}
               {logs.map((line) => (
-                <div
-                  key={line.id}
-                  className={
-                    line.type === "stderr"
-                      ? "text-rose-400 whitespace-pre-wrap min-h-[1em]"
-                      : "text-zinc-300 whitespace-pre-wrap min-h-[1em]"
-                  }
-                >
+                <div key={line.id} className={line.type === 'stderr' ? 'text-rose-400 whitespace-pre-wrap min-h-[1em]' : 'text-zinc-300 whitespace-pre-wrap min-h-[1em]'}>
                   {line.text}
                 </div>
               ))}
@@ -247,7 +208,7 @@ export const LogsModal: React.FC<LogsModalProps> = ({
             </div>
           ) : (
             <div className="text-zinc-600 font-mono text-sm italic">
-              {loading ? "" : t("logsModal.empty")}
+              {loading ? '' : t('logsModal.empty')}
             </div>
           )}
         </div>

@@ -58,7 +58,6 @@ jobs:
         run: |
           go mod download
 
-          VERSION=${GITHUB_REF#refs/tags/}
           # 针对 Windows 特别处理文件扩展名
           if [ "${{ matrix.os }}" = "windows" ]; then
             BIN_NAME="docker-crafter.exe"
@@ -66,7 +65,7 @@ jobs:
             BIN_NAME="docker-crafter"
           fi
 
-          go build -ldflags="-s -w -X docker-dev-panel/config.Version=${VERSION}" -v -o "build/$BIN_NAME" ./cmd/server
+          go build -v -o "build/$BIN_NAME" ./cmd/server
 
       - name: Package Assets
         run: |
@@ -93,33 +92,9 @@ jobs:
             cd ..
           fi
 
-      - name: Extract Release Notes
-        id: extract_notes
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          VERSION_CLEAN=${VERSION#v}
-          # Extract changelog block for the current version
-          awk -v ver="$VERSION_CLEAN" '
-            $0 ~ "^## \\["ver"\\]" || $0 ~ "^## "ver" " || $0 ~ "^## "ver"$" || $0 ~ "^# \\["ver"\\]" || $0 ~ "^# "ver" " || $0 ~ "^# "ver"$" {
-              flag=1
-              print
-              next
-            }
-            /^#+ / {
-              if (flag) {
-                flag=0
-              }
-            }
-            flag {
-              print
-            }
-          ' CHANGELOG.md > RELEASE_NOTES.md
-          echo "notes_file=RELEASE_NOTES.md" >> $GITHUB_OUTPUT
-
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          body_path: ${{ steps.extract_notes.outputs.notes_file }}
           files: |
             docker-crafter_*.tar.gz
             docker-crafter_*.zip
