@@ -16,12 +16,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gorilla/websocket"
+	"github.com/moby/moby/client"
+			"github.com/moby/moby/api/pkg/stdcopy"
 	"docker-dev-panel/config"
 	"docker-dev-panel/logger"
 	"docker-dev-panel/models"
-	"github.com/gorilla/websocket"
-	"github.com/moby/moby/api/pkg/stdcopy"
-	"github.com/moby/moby/client"
 )
 
 // DockerClientInfo 存储每个 Docker 客户端实例和别名
@@ -145,9 +145,9 @@ func NewDockerService(ctx context.Context, engineConfigs []config.DockerEngineCo
 
 	ctx, cancel := context.WithCancel(ctx)
 	ds := &DockerService{
-		clients:     clients,
-		statsCache:  make(map[string]containerStatsResult),
-		cancelFunc:  cancel,
+		clients:    clients,
+		statsCache: make(map[string]containerStatsResult),
+		cancelFunc: cancel,
 		statsWakeup: make(chan struct{}, 1),
 	}
 
@@ -304,7 +304,7 @@ func (s *DockerService) startStatsManager(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			logger.Debugf("Stats manager stopped")
+			logger.Infof("Stats manager stopped")
 			return
 		case <-timer.C:
 			s.refreshStats(ctx)
@@ -624,6 +624,7 @@ func (s *DockerService) ContainerExec(ctx context.Context, id string, cmd []stri
 	return "", "", 0, fmt.Errorf("未找到容器: %s", id)
 }
 
+
 // LogMessage represents a structured log message sent over WebSocket
 type LogMessage struct {
 	Type string `json:"type"`
@@ -631,9 +632,7 @@ type LogMessage struct {
 }
 
 // ContainerLogsStream 实时获取并流式返回容器日志内容
-func (s *DockerService) ContainerLogsStream(ctx context.Context, id string, tail string, conn interface {
-	WriteMessage(messageType int, data []byte) error
-}) error {
+func (s *DockerService) ContainerLogsStream(ctx context.Context, id string, tail string, conn interface { WriteMessage(messageType int, data []byte) error }) error {
 	s.activeWSCount.Add(1)
 	defer s.activeWSCount.Add(-1)
 
@@ -832,9 +831,7 @@ func (s *DockerService) ContainerExecWS(ctx context.Context, id string, shell st
 
 // WSWriter wraps a websocket connection to implement io.Writer
 type WSWriter struct {
-	conn interface {
-		WriteMessage(messageType int, data []byte) error
-	}
+	conn       interface { WriteMessage(messageType int, data []byte) error }
 	streamType string
 }
 
@@ -855,6 +852,7 @@ func (w *WSWriter) Write(p []byte) (n int, err error) {
 	}
 	return len(p), nil
 }
+
 
 // startEventListeners 启动全局的事件监听器，监听各实例容器生命周期变化
 func (s *DockerService) startEventListeners(ctx context.Context) {
@@ -888,7 +886,7 @@ func (s *DockerService) listenClientEvents(ctx context.Context, c DockerClientIn
 		default:
 		}
 
-		logger.Debugf("开始监听实例 [%s] 的 Docker Events", c.Name)
+		logger.Infof("开始监听实例 [%s] 的 Docker Events", c.Name)
 		eventsResult := c.Cli.Events(ctx, options)
 
 	innerLoop:
